@@ -1,0 +1,1 @@
+LEVEL_TYPES = ['assessment', 'idea', 'project', 'course', 'form', 'ideaSelect']

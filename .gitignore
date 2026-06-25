@@ -1,0 +1,12 @@
+__pycache__/
+.env*
+!.env.example
+.DS_Store
+venv/
+*.log
+*.log.*
+
+# Documentation and standards files
+CODING_STANDARDS.md
+COVERAGE_REPORT.md
+.github/instructions/

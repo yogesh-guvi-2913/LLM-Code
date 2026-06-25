@@ -7,6 +7,7 @@ from app.setup.postgres import initPostgreSQLSchema
 from app.setup.logging import initLogging
 
 from app.routes.admin.admin import router as admin
+from app.routes.auth.auth import router as auth
 
 initLogging()
 logger = logging.getLogger(__name__)
@@ -38,3 +39,4 @@ app.add_middleware(
 
 ## This below is for including all routes
 app.include_router(admin)
+app.include_router(auth)

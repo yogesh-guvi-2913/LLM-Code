@@ -10,6 +10,7 @@ class PostgreSQLSchema:
     class Users:
         email: str
         hash: str
+        password: str
         role: Literal['user', 'admin']
         name: str
         active: Literal['true', 'false']
@@ -26,6 +27,7 @@ POSTGRES_BLUEPRINT = [
             'id': 'SERIAL PRIMARY KEY',
             'email': 'VARCHAR(255) UNIQUE NOT NULL',
             'hash': 'VARCHAR(255) NOT NULL',
+            'password': 'TEXT NOT NULL',
             'role': 'VARCHAR(50) DEFAULT \'user\'',
             'name': 'VARCHAR(255) NOT NULL',
             'active': 'VARCHAR(10) DEFAULT \'true\'',

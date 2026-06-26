@@ -24,7 +24,7 @@ services:
       - "5173:5173"
 
   redis:
-    container_name: redis_container 
+    container_name: redis_container
     restart: unless-stopped
     image: redis:8
     volumes:
@@ -32,19 +32,17 @@ services:
     ports:
       - "6379:6379"
 
-  postgres:
-    container_name: postgres_container
+  mongodb:
+    container_name: mongodb_container
     restart: unless-stopped
-    image: postgres:17
+    image: mongo:8
     ports:
-      - "5432:5432"
+      - "27017:27017"
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: llm-code
+      MONGO_INITDB_DATABASE: llm-code
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - mongodb-data:/data/db
 
 volumes:
-  postgres-data:
+  mongodb-data:
   redis-data:

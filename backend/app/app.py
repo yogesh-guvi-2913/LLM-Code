@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 # from app.utils.middleware import AuthenticationMiddleware
-from app.setup.postgres import initPostgreSQLSchema
+from app.setup.mongo import initMongoSchema
 from app.setup.logging import initLogging
 
 from app.routes.admin.admin import router as admin
@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting application...")
-    
+
     # Initialize setup tasks
-    initPostgreSQLSchema()
+    initMongoSchema()
 
     yield
     # For cleaning up the loaded process after the application closes
@@ -40,3 +40,14 @@ app.add_middleware(
 ## This below is for including all routes
 app.include_router(admin)
 app.include_router(auth)
+
+
+@app.get('/')
+def index():
+    """Root endpoint - API health check"""
+    return {
+        "status": "success",
+        "message": "LLM Code API is running",
+        "database": "MongoDB",
+        "version": "1.0.0"
+    }

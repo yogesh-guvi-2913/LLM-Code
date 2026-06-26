@@ -3,7 +3,7 @@ import logging
 import time
 from app.routes.auth.model import *
 from app.utils.auth_utils import validate_email, validate_password, hash_password, sha512_hash
-from app.postgresql.sync.config import get_postgres_connection, release_postgres_connection
+from app.mongodb.sync.mongo import MongoDB
 from app.redis.sync.rediscache import RedisCache
 from app.config import TOKEN_SALT
 import uuid
@@ -21,68 +21,52 @@ def generate_auth_token(email: str) -> str:
 
 def check_user_exists(email: str) -> bool:
     """Check if user already exists in database"""
-    connection = None
-    cursor = None
-
     try:
-        connection = get_postgres_connection()
-        cursor = connection.cursor()
+        mongo = MongoDB()
+        mongo.selectCollection("users")
 
-        query = 'SELECT id FROM "users" WHERE email = %s'
-        cursor.execute(query, (email,))
-        result = cursor.fetchone()
+        query = {"email": email}
+        result = mongo.find(query, projection={'_id': 1}, limit=1)
 
-        return result is not None
+        return len(result) > 0
 
     except Exception as e:
         logger.error(f"Error checking user existence: {str(e)}")
         raise
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            release_postgres_connection(connection)
 
 def create_user(name: str, email: str, password: str) -> dict:
     """Create new user in database"""
-    connection = None
-    cursor = None
-
     try:
-        connection = get_postgres_connection()
-        cursor = connection.cursor()
+        mongo = MongoDB()
+        mongo.selectCollection("users")
 
         email_hash = sha512_hash(email)
         password_hash = hash_password(password)
         current_time = int(time.time() * 1000)
 
-        query = '''
-            INSERT INTO "users" (name, email, hash, password, role, active, "createdAt")
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            RETURNING id, name, email, role
-        '''
-
-        cursor.execute(query, (name, email, email_hash, password_hash, 'user', 'true', current_time))
-        result = cursor.fetchone()
-        connection.commit()
-
-        return {
-            'id': result[0],
-            'name': result[1],
-            'email': result[2],
-            'role': result[3]
+        user_doc = {
+            "name": name,
+            "email": email,
+            "hash": email_hash,
+            "password": password_hash,
+            "role": "user",
+            "active": True,
+            "createdAt": current_time,
+            "lastLoginAt": None
         }
 
+        result = mongo.insertOne(user_doc)
+        if result.inserted_id:
+            return {
+                'id': str(result.inserted_id),
+                'name': name,
+                'email': email,
+                'role': 'user'
+            }
+
     except Exception as e:
-        if connection:
-            connection.rollback()
         logger.error(f"Error creating user: {str(e)}")
         raise
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            release_postgres_connection(connection)
 
 @router.post('/register')
 def register(requestBody: RegisterRequestModel):
@@ -129,35 +113,31 @@ def login(requestBody: LoginRequestModel):
     if not validate_email(requestBody.email):
         raise HTTPException(status_code=400, detail="Invalid email format")
 
-    connection = None
-    cursor = None
-
     try:
-        connection = get_postgres_connection()
-        cursor = connection.cursor()
+        mongo = MongoDB()
+        mongo.selectCollection("users")
 
         # Check if user exists by email
-        query = 'SELECT id, name, email, hash, password, role, active FROM "users" WHERE email = %s'
-        cursor.execute(query, (requestBody.email,))
-        result = cursor.fetchone()
+        query = {"email": requestBody.email}
+        result = mongo.find(query, projection={'_id': 1, 'name': 1, 'email': 1, 'hash': 1, 'password': 1, 'role': 1, 'active': 1}, limit=1)
 
         if not result:
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        user_id, name, email, user_hash, stored_password, role, active = result
+        user = result[0]
 
         # Verify password
         input_password_hash = hash_password(requestBody.password)
-        if input_password_hash != stored_password:
+        if input_password_hash != user.get('password'):
             raise HTTPException(status_code=401, detail="Invalid email or password")
 
         # Check if user is active
-        if active != 'true':
+        if not user.get('active'):
             raise HTTPException(status_code=403, detail="Account is not active")
 
         # Generate auth token using sha512(email + currentTime)
         current_time = int(time.time() * 1000)
-        auth_token = sha512_hash(f"{email}:{current_time}")
+        auth_token = sha512_hash(f"{user.get('email')}:{current_time}")
 
         # Store session in Redis using HSET with key = authToken
         redis_cache = RedisCache()
@@ -165,10 +145,10 @@ def login(requestBody: LoginRequestModel):
         redis_cache.setData(
             redisKey=auth_token,
             dictValue={
-                'email': email,
-                'hash': user_hash,
-                'name': name,
-                'role': role
+                'email': user.get('email'),
+                'hash': user.get('hash'),
+                'name': user.get('name'),
+                'role': user.get('role')
             }
         )
         logger.info(f"Redis data set, setting expiry to 30 days")
@@ -176,19 +156,20 @@ def login(requestBody: LoginRequestModel):
         logger.info(f"Redis expiry set successfully")
 
         # Update last login time
-        update_query = 'UPDATE "users" SET "lastLoginAt" = %s WHERE id = %s'
-        cursor.execute(update_query, (current_time, user_id))
-        connection.commit()
+        mongo.updateOne(
+            query={"_id": user.get('_id')},
+            values={"$set": {"lastLoginAt": current_time}}
+        )
 
-        logger.info(f"User logged in successfully: {email}")
+        logger.info(f"User logged in successfully: {user.get('email')}")
 
         return {
             "success": True,
             "status": "success",
             "authToken": auth_token,
-            "name": name,
-            "email": email,
-            "role": role
+            "name": user.get('name'),
+            "email": user.get('email'),
+            "role": user.get('role')
         }
 
     except HTTPException:
@@ -196,8 +177,35 @@ def login(requestBody: LoginRequestModel):
     except Exception as e:
         logger.error(f"Error during login: {str(e)}")
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
-    finally:
-        if cursor:
-            cursor.close()
-        if connection:
-            release_postgres_connection(connection)
+
+@router.post('/logout')
+def logout(requestBody: LogoutRequestModel):
+    """Logout user by invalidating auth token"""
+    logger.info(f"Received logout request for token: {requestBody.authToken[:10]}...")
+
+    try:
+        redis_cache = RedisCache()
+
+        # Check if token exists in Redis
+        token_exists = redis_cache.checkKeyExists(requestBody.authToken)
+        logger.info(f"Token exists in Redis: {token_exists}")
+
+        if token_exists:
+            # Delete the token from Redis
+            redis_cache.deleteValue(requestBody.authToken)
+            logger.info(f"Token deleted from Redis successfully")
+
+            return {
+                "success": True,
+                "message": "Logout successful"
+            }
+        else:
+            logger.warning(f"Token not found in Redis: {requestBody.authToken[:10]}...")
+            return {
+                "success": True,
+                "message": "Logout successful (token was already expired or invalid)"
+            }
+
+    except Exception as e:
+        logger.error(f"Error during logout: {str(e)}")
+        raise HTTPException(status_code=500, detail="Logout failed. Please try again.")

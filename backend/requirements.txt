@@ -17,15 +17,14 @@ httptools==0.6.4
 icecream==2.1.4
 idna==3.10
 jmespath==1.0.1
-asyncpg==0.30.0
 openpyxl==3.1.5
 pandas==2.2.3
 prometheus_client==0.21.1
-psycopg2-binary==2.9.9
 psutil==6.1.1
 pydantic==2.10.5
 pydantic_core==2.27.2
 Pygments==2.19.1
+pymongo==4.11.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-json-logger==4.0.0

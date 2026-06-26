@@ -6,19 +6,13 @@ ENVIRONMENT = os.getenv('ENV_TYPE', 'development')
 PASSWORD_SALT = os.getenv("PASSWORD_SALT")
 TOKEN_SALT = os.getenv("TOKEN_SALT")
 
-# PostgreSQL Configurations
-POSTGRES_HOST = os.getenv("POSTGRES_HOST")
-POSTGRES_PORT = int(os.getenv("POSTGRES_PORT"))
-POSTGRES_DB = os.getenv("POSTGRES_DB")
-POSTGRES_USER = os.getenv("POSTGRES_USER")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
-REPORT_DB = os.getenv("REPORT_DB")
-COMBINE_DB = os.getenv('COMBINE_DB', 'hackathon-platform-combineDb')
-CHAT_DB = os.getenv('CHAT_DB', 'hackathon-platform-chats')
+# MongoDB Configurations
+MONGO_URI = os.getenv("MONGO_URI")
+MONGO_DB = os.getenv("MONGO_DB", "llm-code")
 
 # Redis Configurations
 REDIS_HOST = os.getenv("REDIS_HOST")
-REDIS_PORT = int(os.getenv("REDIS_PORT"))
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 # S3 Configurations
 S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")

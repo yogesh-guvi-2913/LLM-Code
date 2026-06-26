@@ -10,6 +10,9 @@ class LoginRequestModel(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=1, description="User password")
 
+class LogoutRequestModel(BaseModel):
+    authToken: str = Field(..., description="Authentication token to invalidate")
+
 class AuthResponseModel(BaseModel):
     success: bool
     message: str

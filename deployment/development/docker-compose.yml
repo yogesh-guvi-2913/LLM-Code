@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     build:
       context: ../../backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.development
     volumes:
       - ../../backend:/app
     env_file:

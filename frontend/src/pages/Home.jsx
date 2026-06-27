@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, FlaskConical, MessageSquare, BarChart, LogOut, User, ShoppingBag, ArrowRight, TrendingUp, Clock, CheckCircle, Zap, Bell, Search, Plus, MoreHorizontal, Sparkles } from 'lucide-react';
+import { LayoutDashboard, FlaskConical, MessageSquare, BarChart, LogOut, User, ArrowRight, TrendingUp, Clock, CheckCircle, Zap, Bell, Search, Plus, MoreHorizontal, Sparkles } from 'lucide-react';
 import sidebarLogo from '../assets/sidebar-logo.png';
 import LogoutModal from '../components/LogoutModal';
 
@@ -12,6 +13,50 @@ const Home = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [tests, setTests] = useState([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      if (!user?.authToken || activeTab !== 'dashboard') return;
+
+      setIsLoadingTests(true);
+
+      try {
+        const response = await fetch('http://localhost:8000/dashboard', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            authToken: user.authToken
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          setTests(data.tests || []);
+        } else if (data.detail === 'token_expired') {
+          toast.error('Session Expired. Please Login again.', {
+            duration: 3000,
+            position: 'top-center'
+          });
+          authLogout();
+          navigate('/login');
+        } else {
+          console.error('Failed to fetch dashboard data:', data.detail || 'Unknown error');
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        toast.error('Failed to load dashboard data. Please try again.');
+      } finally {
+        setIsLoadingTests(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [activeTab, user?.authToken, authLogout, navigate]);
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -26,17 +71,6 @@ const Home = () => {
     { label: 'Failed', value: '3', change: '-2%', trend: 'down', icon: TrendingUp },
     { label: 'Pending', value: '3', change: '0%', trend: 'neutral', icon: Clock }
   ];
-
-  const testCard = {
-    id: 1,
-    title: 'Ecommerce Website',
-    description: 'Comprehensive testing for AI models in ecommerce scenarios including product recommendations, search, and checkout flows.',
-    status: 'Available',
-    difficulty: 'Intermediate',
-    duration: '15 min',
-    icon: ShoppingBag,
-    category: 'Production'
-  };
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -450,187 +484,102 @@ const Home = () => {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: 0.3 }}
-                      className="group cursor-pointer"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        borderRadius: '20px',
-                        padding: '28px',
-                        transition: 'all 0.3s ease'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)';
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(139,92,246,0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
-                    >
-                      <div className="flex items-start justify-between mb-6">
-                        <div
-                          className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300"
+                    {isLoadingTests ? (
+                      <div className="col-span-full flex justify-center items-center py-20">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderColor: '#8B5CF6' }}></div>
+                      </div>
+                    ) : tests.length === 0 ? (
+                      <div className="col-span-full text-center py-20">
+                        <FlaskConical size={48} style={{ color: '#6B7280' }} />
+                        <p className="mt-4 text-lg" style={{ color: '#6B7280' }}>
+                          No tests available at the moment
+                        </p>
+                      </div>
+                    ) : (
+                      tests.map((test, index) => (
+                        <motion.div
+                          key={test.testId}
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.3, delay: 0.3 + index * 0.1 }}
+                          onClick={() => navigate(`/test/${test.testId}`)}
+                          className="group cursor-pointer"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(168,85,247,0.1) 100%)',
-                            border: '1px solid rgba(139,92,246,0.2)',
-                            color: '#8B5CF6'
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+                            border: '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: '20px',
+                            padding: '28px',
+                            transition: 'all 0.3s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)';
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(139,92,246,0.1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
                           }}
                         >
-                          <testCard.icon size={28} />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="px-2.5 py-1 rounded-full text-xs font-medium"
-                            style={{
-                              backgroundColor: 'rgba(16,185,129,0.15)',
-                              color: '#10B981',
-                              border: '1px solid rgba(16,185,129,0.2)',
-                              fontWeight: 600
-                            }}
-                          >
-                            {testCard.status}
-                          </span>
-                          <button className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#6B7280' }}>
-                            <MoreHorizontal size={16} />
-                          </button>
-                        </div>
-                      </div>
-                      <h5 className="text-xl font-bold mb-3" style={{ color: '#FFFFFF', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                        {testCard.title}
-                      </h5>
-                      <p className="text-sm mb-5" style={{ color: '#9CA3AF', lineHeight: 1.6 }}>
-                        {testCard.description}
-                      </p>
-                      <div className="flex items-center gap-3 mb-5">
-                        <div className="flex items-center gap-1.5">
-                          <div
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: testCard.difficulty === 'Beginner' ? '#10B981' : testCard.difficulty === 'Intermediate' ? '#F59E0B' : '#EF4444' }}
-                          />
-                          <span className="text-xs font-medium" style={{ color: '#6B7280', fontWeight: 500 }}>
-                            {testCard.difficulty}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock size={14} style={{ color: '#6B7280' }} />
-                          <span className="text-xs font-medium" style={{ color: '#6B7280', fontWeight: 500 }}>
-                            {testCard.duration}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#8B5CF6' }} />
-                          <span className="text-xs font-medium" style={{ color: '#6B7280', fontWeight: 500 }}>
-                            {testCard.category}
-                          </span>
-                        </div>
-                      </div>
-                      <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        className="w-full py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all duration-200"
-                        style={{
-                          background: 'linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%)',
-                          boxShadow: '0 8px 20px rgba(139,92,246,0.25)',
-                          fontSize: '15px',
-                          fontWeight: 600
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'linear-gradient(90deg, #A855F7 0%, #C084FC 100%)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = 'linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%)';
-                        }}
-                      >
-                        <span>Start Test</span>
-                        <ArrowRight size={18} />
-                      </motion.button>
-                    </motion.div>
-
-                    {/* Add more test cards as placeholder */}
-                    {[
-                      { title: 'Chatbot Response', description: 'Evaluate conversational AI responses for accuracy and relevance.', icon: MessageSquare, difficulty: 'Advanced', duration: '20 min' },
-                      { title: 'Content Generation', description: 'Test AI model\'s ability to generate high-quality written content.', icon: Sparkles, difficulty: 'Intermediate', duration: '25 min' }
-                    ].map((test, index) => (
-                      <motion.div
-                        key={test.title}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.3, delay: 0.4 + index * 0.1 }}
-                        className="group cursor-pointer opacity-50"
-                        style={{
-                          background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: '20px',
-                          padding: '28px'
-                        }}
-                      >
-                        <div className="flex items-start justify-between mb-6">
-                          <div
-                            className="w-14 h-14 rounded-xl flex items-center justify-center"
-                            style={{
-                              background: 'linear-gradient(135deg, rgba(107,114,128,0.15) 0%, rgba(107,114,128,0.05) 100%)',
-                              border: '1px solid rgba(107,114,128,0.15)',
-                              color: '#6B7280'
-                            }}
-                          >
-                            <test.icon size={28} />
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="px-2.5 py-1 rounded-full text-xs font-medium"
+                          <div className="flex items-start justify-between mb-6">
+                            <div
+                              className="w-14 h-14 rounded-xl flex items-center justify-center transition-all duration-300"
                               style={{
-                                backgroundColor: 'rgba(107,114,128,0.15)',
-                                color: '#6B7280',
-                                border: '1px solid rgba(107,114,128,0.15)',
-                                fontWeight: 600
+                                background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(168,85,247,0.1) 100%)',
+                                border: '1px solid rgba(139,92,246,0.2)',
+                                color: '#8B5CF6'
                               }}
                             >
-                              Coming Soon
-                            </span>
+                              <FlaskConical size={28} />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="px-2.5 py-1 rounded-full text-xs font-medium"
+                                style={{
+                                  backgroundColor: test.status === 'Available' ? 'rgba(16,185,129,0.15)' : 'rgba(107,114,128,0.15)',
+                                  color: test.status === 'Available' ? '#10B981' : '#6B7280',
+                                  border: test.status === 'Available' ? '1px solid rgba(16,185,129,0.2)' : '1px solid rgba(107,114,128,0.15)',
+                                  fontWeight: 600
+                                }}
+                              >
+                                {test.status}
+                              </span>
+                              <button className="p-1.5 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#6B7280' }}>
+                                <MoreHorizontal size={16} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <h5 className="text-xl font-bold mb-3" style={{ color: '#FFFFFF', fontWeight: 600, letterSpacing: '-0.01em' }}>
-                          {test.title}
-                        </h5>
-                        <p className="text-sm mb-5" style={{ color: '#9CA3AF', lineHeight: 1.6 }}>
-                          {test.description}
-                        </p>
-                        <div className="flex items-center gap-3 mb-5">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#6B7280' }} />
-                            <span className="text-xs font-medium" style={{ color: '#6B7280', fontWeight: 500 }}>
-                              {test.difficulty}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Clock size={14} style={{ color: '#6B7280' }} />
-                            <span className="text-xs font-medium" style={{ color: '#6B7280', fontWeight: 500 }}>
-                              {test.duration}
-                            </span>
-                          </div>
-                        </div>
-                        <button
-                          disabled
-                          className="w-full py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2"
-                          style={{
-                            backgroundColor: 'rgba(107,114,128,0.15)',
-                            border: '1px solid rgba(107,114,128,0.2)',
-                            fontSize: '15px',
-                            fontWeight: 600,
-                            color: '#6B7280',
-                            cursor: 'not-allowed'
-                          }}
-                        >
-                          <span>Coming Soon</span>
-                        </button>
-                      </motion.div>
-                    ))}
+                          <h5 className="text-xl font-bold mb-3" style={{ color: '#FFFFFF', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                            {test.problemTitle}
+                          </h5>
+                          <p className="text-sm mb-5" style={{ color: '#9CA3AF', lineHeight: 1.6 }}>
+                            {test.problemDescription}
+                          </p>
+                          <motion.button
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => navigate(`/test/${test.testId}`)}
+                            className="w-full py-3 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all duration-200"
+                            style={{
+                              background: 'linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%)',
+                              boxShadow: '0 8px 20px rgba(139,92,246,0.25)',
+                              fontSize: '15px',
+                              fontWeight: 600
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'linear-gradient(90deg, #A855F7 0%, #C084FC 100%)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'linear-gradient(90deg, #8B5CF6 0%, #A855F7 100%)';
+                            }}
+                          >
+                            <span>Start Test</span>
+                            <ArrowRight size={18} />
+                          </motion.button>
+                        </motion.div>
+                      ))
+                    )}
                   </div>
                 </div>
               </motion.div>

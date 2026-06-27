@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import TestPage from './pages/TestPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
@@ -11,6 +12,11 @@ function App() {
         <Route path="/" element={
           <ProtectedRoute>
             <Home />
+          </ProtectedRoute>
+        } />
+        <Route path="/test/:testId" element={
+          <ProtectedRoute>
+            <TestPage />
           </ProtectedRoute>
         } />
       </Routes>

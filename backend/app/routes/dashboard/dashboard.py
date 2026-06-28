@@ -147,7 +147,11 @@ def get_test_details(requestBody: dict):
                 "name": test_data.get('name'),
                 "description": test_data.get('description'),
                 "details": test_data.get('details'),
-                "questions": test_data.get('questions', [])
+                "questions": test_data.get('questions', []),
+                "codeEdit": test_data.get('codeEdit', 0),
+                "duration": test_data.get('duration', 1800),
+                "initialFiles": test_data.get('initialFiles', None),
+                "evaluationCriteria": test_data.get('evaluationCriteria', None)
             }
         }
 

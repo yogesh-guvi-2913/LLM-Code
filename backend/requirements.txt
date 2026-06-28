@@ -44,3 +44,5 @@ uvloop==0.21.0
 watchfiles==1.0.4
 websockets==14.2
 xlrd==2.0.1
+openai>=1.0.0
+playwright>=1.40.0

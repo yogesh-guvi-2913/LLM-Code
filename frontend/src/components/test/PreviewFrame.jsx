@@ -1,65 +1,51 @@
-import { useCallback, useMemo, useRef, useEffect, useState } from 'react';
-import { buildPreviewHTML } from '../../utils/previewBuilder';
+import { useState, useRef, useEffect } from 'react';
 import { useTest } from '../../contexts/TestContext';
-import { useConsoleCapture } from '../../hooks/useConsoleCapture';
-import { Maximize2, RefreshCw, Smartphone, Monitor } from 'lucide-react';
+import { Maximize2, RefreshCw, Smartphone, Monitor, Loader2, AlertCircle } from 'lucide-react';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 function PreviewFrame() {
-  const { files, addConsoleLog, addPreviewError, clearConsoleLogs, clearPreviewErrors } = useTest();
-  const [iframeKey, setIframeKey] = useState(0);
+  const { sessionInfo, sessionStatus } = useTest();
   const [viewport, setViewport] = useState('desktop');
-  const [isReady, setIsReady] = useState(false);
-  const debounceTimer = useRef(null);
-
-  const onLog = useCallback((log) => {
-    addConsoleLog(log);
-  }, [addConsoleLog]);
-
-  const onError = useCallback((error) => {
-    addPreviewError(error);
-  }, [addPreviewError]);
-
-  useConsoleCapture(onLog, onError);
-
-  const html = useMemo(() => {
-    try {
-      return buildPreviewHTML(files);
-    } catch (err) {
-      console.error('Preview build error:', err);
-      return `<html><body style="padding:20px;color:#f48771;font-family:monospace;"><h3>Preview Build Error</h3><pre>${err.message}</pre></body></html>`;
-    }
-  }, [files]);
-
-  useEffect(() => {
-    clearConsoleLogs();
-    clearPreviewErrors();
-    setIsReady(false);
-
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-    debounceTimer.current = setTimeout(() => {
-      setIframeKey(prev => prev + 1);
-      setIsReady(true);
-    }, 300);
-
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [html, clearConsoleLogs, clearPreviewErrors]);
+  const [iframeKey, setIframeKey] = useState(0);
+  const iframeRef = useRef(null);
 
   const handleRefresh = () => {
-    clearConsoleLogs();
-    clearPreviewErrors();
     setIframeKey(prev => prev + 1);
   };
 
   const handleExpand = () => {
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    if (sessionInfo?.frontendUrl) {
+      window.open(`${API_BASE_URL}${sessionInfo.frontendUrl}`, '_blank');
+    }
   };
 
+  if (sessionStatus === 'starting' || sessionStatus === 'idle') {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-gray-50">
+        <Loader2 className="animate-spin mb-3 text-violet-500" size={28} />
+        <p className="text-sm text-gray-600 font-medium">Starting containers...</p>
+        <p className="text-xs text-gray-400 mt-1">Spinning up frontend, backend & database</p>
+      </div>
+    );
+  }
+
+  if (sessionStatus === 'error' || !sessionInfo) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-gray-50">
+        <AlertCircle className="mb-3 text-red-400" size={28} />
+        <p className="text-sm text-red-500 font-medium">Failed to start preview</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-3 px-3 py-1.5 text-xs bg-violet-500 text-white rounded-lg hover:bg-violet-600 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  const previewUrl = `${API_BASE_URL}${sessionInfo.frontendUrl}`;
   const viewportWidth = viewport === 'mobile' ? '375px' : '100%';
 
   return (
@@ -81,7 +67,11 @@ function PreviewFrame() {
             <Smartphone size={14} />
           </button>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Live</span>
+          </div>
           <button
             onClick={handleRefresh}
             className="p-1.5 rounded text-gray-400 hover:text-gray-600 hover:bg-gray-200 transition-colors"
@@ -103,20 +93,14 @@ function PreviewFrame() {
           style={{ width: viewportWidth, maxWidth: '100%' }}
           className="h-full bg-white transition-all duration-200 shadow-sm"
         >
-          {!isReady ? (
-            <div className="flex items-center justify-center h-full text-gray-400">
-              <RefreshCw size={16} className="animate-spin mr-2" />
-              <span className="text-xs">Building preview...</span>
-            </div>
-          ) : (
-            <iframe
-              key={iframeKey}
-              srcDoc={html}
-              title="preview"
-              sandbox="allow-scripts"
-              className="w-full h-full border-0"
-            />
-          )}
+          <iframe
+            key={iframeKey}
+            ref={iframeRef}
+            src={previewUrl}
+            title="preview"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+            className="w-full h-full border-0"
+          />
         </div>
       </div>
     </div>

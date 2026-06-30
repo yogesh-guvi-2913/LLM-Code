@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { useAIChat } from '../hooks/useAIChat';
 
@@ -12,208 +12,59 @@ const stripCodeBlocks = (text) => {
     .trim();
 };
 
-const DEFAULT_FILES = {
-  'vite.config.js': {
-    name: 'vite.config.js',
-    language: 'javascript',
-    content: `import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-export default defineConfig({
-  plugins: [react()],
-})`
-  },
-  'index.html': {
-    name: 'index.html',
-    language: 'html',
-    content: `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite + React</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
-</html>`
-  },
-  'package.json': {
-    name: 'package.json',
-    language: 'json',
-    content: `{
-  "name": "vite-react-app",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
-    "vite": "^5.0.0"
-  }
-}`
-  },
-  'src/main.jsx': {
-    name: 'main.jsx',
-    language: 'javascript',
-    content: `import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App.jsx'
-import './index.css'
-
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)`
-  },
-  'src/App.jsx': {
-    name: 'App.jsx',
-    language: 'javascript',
-    content: `import { useState } from 'react'
-import './App.css'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div className="App">
-      <h1>Vite + React</h1>
-      <button onClick={() => setCount(c => c + 1)}>
-        count is {count}
-      </button>
-    </div>
-  )
-}
-
-export default App`
-  },
-  'src/App.css': {
-    name: 'App.css',
-    language: 'css',
-    content: `.App {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}`
-  },
-  'src/index.css': {
-    name: 'index.css',
-    language: 'css',
-    content: `:root {
-  font-family: Inter, system-ui, sans-serif;
-  line-height: 1.5;
-  color-scheme: light dark;
-}
-
-body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
-}`
-  },
-  'src/pages/Home.jsx': {
-    name: 'Home.jsx',
-    language: 'javascript',
-    content: `export default function Home() {
-  return (
-    <div>
-      <h1>Home Page</h1>
-    </div>
-  )
-}`
-  },
-  'src/pages/Login.jsx': {
-    name: 'Login.jsx',
-    language: 'javascript',
-    content: `export default function Login() {
-  return (
-    <div>
-      <h1>Login Page</h1>
-    </div>
-  )
-}`
-  },
-  'src/components/Navbar.jsx': {
-    name: 'Navbar.jsx',
-    language: 'javascript',
-    content: `export default function Navbar() {
-  return (
-    <nav>
-      <h1>Navbar</h1>
-    </nav>
-  )
-}`
-  },
-  'src/contexts/AuthContext.jsx': {
-    name: 'AuthContext.jsx',
-    language: 'javascript',
-    content: `import { createContext, useContext, useState } from 'react'
-
-const AuthContext = createContext()
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  return (
-    <AuthContext.Provider value={{ user, setUser }}>
-      {children}
-    </AuthContext.Provider>
-  )
-}
-
-export const useAuth = () => useContext(AuthContext)`
-  },
-  'src/utils/api.js': {
-    name: 'api.js',
-    language: 'javascript',
-    content: `const API_BASE = 'http://localhost:8000'
-
-export async function apiFetch(endpoint, options = {}) {
-  const res = await fetch(\`\${API_BASE}/\${endpoint}\`, options)
-  return res.json()
-}`
-  },
-  'public/vite.svg': {
-    name: 'vite.svg',
-    language: 'xml',
-    content: `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <path fill="#646CFF" d="M16 2L2 16l14 14 14-14z"/>
-</svg>`
-  }
+const getLanguageFromPath = (path) => {
+  const ext = path.split('.').pop()?.toLowerCase();
+  const languageMap = {
+    'js': 'javascript', 'jsx': 'javascript', 'ts': 'typescript',
+    'tsx': 'typescript', 'css': 'css', 'scss': 'scss',
+    'html': 'html', 'json': 'json', 'md': 'markdown',
+    'py': 'python', 'yaml': 'yaml', 'yml': 'yaml',
+    'sh': 'shell', 'bash': 'shell', 'dockerfile': 'dockerfile',
+  };
+  if (ext === 'dockerfile' || path.toLowerCase().includes('dockerfile')) return 'dockerfile';
+  if (path.endsWith('.worker_addon')) return 'json';
+  return languageMap[ext] || 'plaintext';
 };
 
-const FOLDER_TREE = {
-  'root': {
-    name: 'project',
-    folders: {
-      'src': {
-        name: 'src',
-        folders: {
-          'pages': { name: 'pages', folders: {}, files: ['src/pages/Home.jsx', 'src/pages/Login.jsx'] },
-          'components': { name: 'components', folders: {}, files: ['src/components/Navbar.jsx'] },
-          'contexts': { name: 'contexts', folders: {}, files: ['src/contexts/AuthContext.jsx'] },
-          'utils': { name: 'utils', folders: {}, files: ['src/utils/api.js'] },
-          'assets': { name: 'assets', folders: {}, files: [] }
-        },
-        files: ['src/main.jsx', 'src/App.jsx', 'src/App.css', 'src/index.css']
-      },
-      'public': { name: 'public', folders: {}, files: ['public/vite.svg'] }
-    },
-    files: ['vite.config.js', 'index.html', 'package.json']
+const buildFolderTreeFromFiles = (files) => {
+  const root = { id: 'root', name: 'project', folders: {}, files: [] };
+  
+  for (const filePath of Object.keys(files)) {
+    const parts = filePath.split('/').filter(Boolean);
+    if (parts.length === 0) continue;
+    
+    let current = root;
+    let currentId = 'root';
+    const fileName = parts[parts.length - 1];
+    
+    for (let i = 0; i < parts.length - 1; i++) {
+      const folderName = parts[i];
+      const folderId = `${currentId}/${folderName}`;
+      
+      if (!current.folders[folderId]) {
+        current.folders[folderId] = { id: folderId, name: folderName, folders: {}, files: [] };
+      }
+      current = current.folders[folderId];
+      currentId = folderId;
+    }
+    
+    current.files.push(filePath);
   }
+  
+  return { root };
+};
+
+const convertProjectFilesToState = (projectFiles) => {
+  const state = {};
+  for (const [path, content] of Object.entries(projectFiles)) {
+    if (typeof content !== 'string') continue;
+    state[path] = {
+      name: path.split('/').pop(),
+      language: getLanguageFromPath(path),
+      content,
+    };
+  }
+  return state;
 };
 
 export function TestProvider({ testId, authToken, navigate, children }) {
@@ -225,22 +76,24 @@ export function TestProvider({ testId, authToken, navigate, children }) {
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showProblemModal, setShowProblemModal] = useState(false);
-  const [activeRightTab, setActiveRightTab] = useState('code');
-  const [expandedFolders, setExpandedFolders] = useState(['root', 'src', 'src/pages', 'src/components', 'src/contexts', 'src/assets', 'src/utils', 'public']);
-  const [selectedFile, setSelectedFile] = useState('src/App.jsx');
+  const [activeRightTab, setActiveRightTab] = useState('preview');
+  const [expandedFolders, setExpandedFolders] = useState(['root']);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [showTerminal, setShowTerminal] = useState(true);
   const [terminalLines, setTerminalLines] = useState([
-    { type: 'system', text: 'Vite + React project loaded. Type a command and press Enter.' }
+    { type: 'system', text: 'Session starting...' }
   ]);
   const [terminalInput, setTerminalInput] = useState('');
   const [activeTerminalTab, setActiveTerminalTab] = useState('terminal');
-  const [files, setFiles] = useState(DEFAULT_FILES);
+  const [files, setFiles] = useState({});
   const [consoleLogs, setConsoleLogs] = useState([]);
   const [previewErrors, setPreviewErrors] = useState([]);
+  const [sessionInfo, setSessionInfo] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState('idle');
   const terminalEndRef = useRef(null);
   const timeLeftRef = useRef(testData?.duration || 1800);
 
-  const folderTree = FOLDER_TREE;
+  const folderTree = useMemo(() => buildFolderTreeFromFiles(files), [files]);
 
   const toggleFolder = useCallback((folderId) => {
     setExpandedFolders(prev =>
@@ -265,7 +118,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
         output = 'Available commands: help, clear, ls, pwd, npm run dev, npm run build, npm install';
         break;
       case 'ls':
-        output = 'node_modules/  public/  src/  index.html  package.json  vite.config.js';
+        output = 'frontend/  backend/  docker-compose.yml';
         break;
       case 'pwd':
         output = '/home/project';
@@ -344,14 +197,9 @@ export function TestProvider({ testId, authToken, navigate, children }) {
         if (action === 'delete') {
           delete newFiles[path];
         } else {
-          const ext = path.split('.').pop()?.toLowerCase();
-          const languageMap = {
-            'js': 'javascript', 'jsx': 'javascript', 'ts': 'typescript',
-            'tsx': 'typescript', 'css': 'css', 'html': 'html', 'json': 'json'
-          };
           newFiles[path] = {
             name: path.split('/').pop(),
-            language: languageMap[ext] || 'plaintext',
+            language: getLanguageFromPath(path),
             content
           };
         }
@@ -367,6 +215,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
   const { sendMessage: wsSendMessage, isConnected: wsConnected } = useAIChat({
     testId,
     authToken,
+    sessionId: sessionInfo?.sessionId,
     onCodeChanges: handleCodeChanges,
     onError: handleAIError
   });
@@ -487,10 +336,64 @@ export function TestProvider({ testId, authToken, navigate, children }) {
           setChatMessages([
             { role: 'assistant', content: `Hello! I'm here to help you with "${data.test.name}".\n\nYou can ask me questions about the problem, request hints, or clarify requirements. I'll also provide code suggestions as you work through the solution.` }
           ]);
-          if (data.test.initialFiles) {
-            setFiles(prev => ({ ...prev, ...data.test.initialFiles }));
+
+          if (data.test.projectFiles && Object.keys(data.test.projectFiles).length > 0) {
+            const convertedFiles = convertProjectFilesToState(data.test.projectFiles);
+            setFiles(convertedFiles);
+            
+            const firstFile = Object.keys(convertedFiles)[0];
+            if (firstFile) {
+              setSelectedFile(firstFile);
+            }
+
+            const allFolderPaths = ['root'];
+            for (const path of Object.keys(convertedFiles)) {
+              const parts = path.split('/').filter(Boolean);
+              let currentPath = 'root';
+              for (let i = 0; i < parts.length - 1; i++) {
+                currentPath = `${currentPath}/${parts[i]}`;
+                if (!allFolderPaths.includes(currentPath)) {
+                  allFolderPaths.push(currentPath);
+                }
+              }
+            }
+            setExpandedFolders(allFolderPaths);
           }
+
           timeLeftRef.current = data.test.duration || 1800;
+
+          setSessionStatus('starting');
+          setTerminalLines(prev => [...prev, { type: 'system', text: 'Starting Docker containers...' }]);
+
+          try {
+            const sessionRes = await fetch('http://localhost:8000/session/start', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ authToken, testId })
+            });
+            const sessionData = await sessionRes.json();
+
+            if (sessionData.success && sessionData.session) {
+              setSessionInfo(sessionData.session);
+              setSessionStatus('ready');
+              setTerminalLines(prev => [...prev, {
+                type: 'system',
+                text: `Containers ready! Preview: ${sessionData.session.frontendUrl}`
+              }]);
+            } else {
+              setSessionStatus('error');
+              setTerminalLines(prev => [...prev, {
+                type: 'error',
+                text: `Failed to start containers: ${sessionData.detail || 'Unknown error'}`
+              }]);
+            }
+          } catch (sessionErr) {
+            setSessionStatus('error');
+            setTerminalLines(prev => [...prev, {
+              type: 'error',
+              text: `Session start error: ${sessionErr.message}`
+            }]);
+          }
         } else if (data.detail === 'token_expired') {
           toast.error('Session Expired. Please Login again.');
           navigate('/login');
@@ -507,6 +410,18 @@ export function TestProvider({ testId, authToken, navigate, children }) {
 
     fetchTestData();
   }, [testId, authToken, navigate]);
+
+  useEffect(() => {
+    return () => {
+      if (sessionInfo?.sessionId && authToken) {
+        fetch('http://localhost:8000/session/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authToken, sessionId: sessionInfo.sessionId })
+        }).catch(() => {});
+      }
+    };
+  }, [sessionInfo?.sessionId, authToken]);
 
   useEffect(() => {
     if (terminalEndRef.current) {
@@ -556,6 +471,8 @@ export function TestProvider({ testId, authToken, navigate, children }) {
     addPreviewError,
     clearPreviewErrors,
     wsConnected,
+    sessionInfo,
+    sessionStatus,
   };
 
   return (

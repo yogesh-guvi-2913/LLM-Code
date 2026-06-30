@@ -12,6 +12,9 @@ class RedisCache:
     def setValue(self, redisKey: str, redisValue: str):
         return self.connection.set(redisKey, redisValue)
     
+    def setex(self, redisKey: str, ttl: int, redisValue: str):
+        return self.connection.setex(redisKey, ttl, redisValue)
+    
     def deleteValue(self, redisKey: str):
         return self.connection.delete(redisKey)
     

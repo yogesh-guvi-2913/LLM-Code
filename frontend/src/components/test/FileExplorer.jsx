@@ -11,7 +11,8 @@ function FileExplorer() {
     files
   } = useTest();
 
-  const renderFolder = (folderId, folder, depth = 0) => {
+  const renderFolder = (folder, depth = 0) => {
+    const folderId = folder.id;
     const isExpanded = expandedFolders.includes(folderId);
     return (
       <div key={folderId}>
@@ -29,8 +30,8 @@ function FileExplorer() {
         </button>
         {isExpanded && (
           <div>
-            {Object.entries(folder.folders).map(([childId, childFolder]) =>
-              renderFolder(childId, childFolder, depth + 1)
+            {Object.values(folder.folders).map((childFolder) =>
+              renderFolder(childFolder, depth + 1)
             )}
             {folder.files.map(filePath => {
               const file = files[filePath];
@@ -65,7 +66,7 @@ function FileExplorer() {
         <span className="text-xs font-medium text-gray-300">Explorer</span>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
-        {renderFolder('root', folderTree.root, 0)}
+        {folderTree?.root && renderFolder(folderTree.root, 0)}
       </div>
     </div>
   );

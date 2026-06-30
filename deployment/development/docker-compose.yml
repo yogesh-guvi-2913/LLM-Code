@@ -1,4 +1,17 @@
 services:
+  nginx:
+    container_name: nginx_container
+    restart: unless-stopped
+    image: nginx:alpine
+    volumes:
+      - ../../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - session_confs:/etc/nginx/sessions
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+
   backend:
     container_name: backend_container
     restart: unless-stopped
@@ -7,10 +20,16 @@ services:
       dockerfile: Dockerfile.development
     volumes:
       - ../../backend:/app
+      - /tmp/sessions:/tmp/sessions
+      - /var/run/docker.sock:/var/run/docker.sock
+      - session_confs:/etc/nginx/sessions
     env_file:
       - ../../.env.development
     ports:
       - "8000:7000"
+    environment:
+      - SESSIONS_DIR=/tmp/sessions
+      - NGINX_SESSIONS_DIR=/etc/nginx/sessions
 
   frontend:
     container_name: frontend_container
@@ -20,6 +39,8 @@ services:
       dockerfile: Dockerfile.development
     volumes:
       - ../../frontend/src:/usr/src/app/src
+    expose:
+      - "5173"
     ports:
       - "5173:5173"
 
@@ -46,3 +67,4 @@ services:
 volumes:
   mongodb-data:
   redis-data:
+  session_confs:

@@ -9,6 +9,7 @@ from app.routes.admin.admin import router as admin
 from app.routes.auth.auth import router as auth
 from app.routes.dashboard.dashboard import router as dashboard
 from app.routes.evaluation.routes import router as evaluation
+from app.routes.session.routes import router as session
 from app.routes.ai.chat import handle_websocket_connection
 
 initLogging()
@@ -35,6 +36,7 @@ app.include_router(admin)
 app.include_router(auth)
 app.include_router(dashboard)
 app.include_router(evaluation)
+app.include_router(session)
 
 
 @app.websocket("/ws/ai-chat/{test_id}")

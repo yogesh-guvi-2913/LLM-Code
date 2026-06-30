@@ -9,6 +9,7 @@ from app.redis.async_version.utils import MyRedis
 from app.mongodb.sync.mongo import MongoDB
 from app.routes.ai.llm_router import get_llm_router
 from app.routes.ai.prompt_builder import build_system_prompt
+from app.services.file_sync import sync_files_to_session
 
 logger = logging.getLogger(__name__)
 
@@ -131,6 +132,8 @@ async def handle_websocket_connection(
     if not await _safe_send(websocket, {"type": "connected"}):
         return
     
+    session_id = f"{test_id}_{user_hash[:12]}"
+    
     conversation_history = []
     
     try:
@@ -139,6 +142,12 @@ async def handle_websocket_connection(
             
             if data.get("type") == "ping":
                 await _safe_send(websocket, {"type": "pong"})
+                continue
+            
+            if data.get("type") == "sync":
+                changes = data.get("changes", [])
+                if session_id and changes:
+                    await sync_files_to_session(session_id, changes)
                 continue
             
             user_message = data.get("message", "")
@@ -203,6 +212,9 @@ async def handle_websocket_connection(
                         ai_response=accumulated_response,
                         code_changes=code_changes_received
                     )
+                    
+                    if code_changes_received and session_id:
+                        await sync_files_to_session(session_id, code_changes_received)
                     
             except Exception as e:
                 logger.error(f"Error streaming LLM response: {e}")

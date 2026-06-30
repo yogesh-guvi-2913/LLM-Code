@@ -1,9 +1,19 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import TestPage from './pages/TestPage'
 import Results from './pages/Results'
+import AdminDashboard from './pages/AdminDashboard'
 import ProtectedRoute from './components/ProtectedRoute'
+import { useAuth } from './contexts/AuthContext'
+
+function AdminRoute({ children }) {
+  const { user } = useAuth()
+  if (user?.role !== 'admin' && user?.role !== 'instructor') {
+    return <Navigate to="/" replace />
+  }
+  return children
+}
 
 function App() {
   return (
@@ -23,6 +33,13 @@ function App() {
         <Route path="/results/:testId" element={
           <ProtectedRoute>
             <Results />
+          </ProtectedRoute>
+        } />
+        <Route path="/admin" element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
           </ProtectedRoute>
         } />
       </Routes>

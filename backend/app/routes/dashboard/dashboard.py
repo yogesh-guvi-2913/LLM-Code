@@ -150,7 +150,12 @@ def get_test_details(requestBody: dict):
                 "questions": test_data.get('questions', []),
                 "codeEdit": test_data.get('codeEdit', 0),
                 "duration": test_data.get('duration', 1800),
-                "initialFiles": test_data.get('initialFiles', None),
+                "requirements": test_data.get('requirements', []),
+                "checks": test_data.get('checks', []),
+                "techStack": test_data.get('techStack', {}),
+                "projectFiles": test_data.get('projectFiles', {}),
+                "composeContent": test_data.get('composeContent', ''),
+                "projectMeta": test_data.get('projectMeta', {}),
                 "evaluationCriteria": test_data.get('evaluationCriteria', None)
             }
         }

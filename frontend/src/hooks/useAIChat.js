@@ -3,7 +3,7 @@ import { useRef, useCallback, useEffect, useState } from 'react';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws');
 
-export function useAIChat({ testId, authToken, onCodeChanges, onError }) {
+export function useAIChat({ testId, authToken, sessionId, onCodeChanges, onError }) {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -27,7 +27,10 @@ export function useAIChat({ testId, authToken, onCodeChanges, onError }) {
 
     isClosingRef.current = false;
 
-    const url = `${WS_BASE_URL}/ws/ai-chat/${testId}?token=${authToken}`;
+    let url = `${WS_BASE_URL}/ws/ai-chat/${testId}?token=${authToken}`;
+    if (sessionId) {
+      url += `&sessionId=${sessionId}`;
+    }
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -63,6 +66,9 @@ export function useAIChat({ testId, authToken, onCodeChanges, onError }) {
             onCodeChangesRef.current?.(files);
           }
           break;
+        case 'sync':
+          cb?.onSync?.(content);
+          break;
         case 'done':
           setIsStreaming(false);
           cb?.onDone?.();
@@ -95,7 +101,7 @@ export function useAIChat({ testId, authToken, onCodeChanges, onError }) {
     };
 
     ws.onerror = () => {};
-  }, [testId, authToken]);
+  }, [testId, authToken, sessionId]);
 
   useEffect(() => {
     connect();

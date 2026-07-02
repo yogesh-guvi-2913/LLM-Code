@@ -9,7 +9,7 @@ from app.redis.async_version.utils import MyRedis
 from app.mongodb.sync.mongo import MongoDB
 from app.routes.ai.llm_router import get_llm_router
 from app.routes.ai.prompt_builder import build_system_prompt
-from app.services.file_sync import sync_files_to_session
+from app.services.file_sync import sync_files_to_session, extract_npm_imports
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +193,9 @@ async def handle_websocket_connection(
                             client_disconnected = True
                             break
                     
+                    elif chunk_type == "retry":
+                        logger.info(f"Auto-retrying incomplete response: attempt {chunk.get('count')}")
+                    
                     elif chunk_type == "done":
                         await _safe_send(websocket, {"type": "done"})
                     
@@ -215,6 +218,17 @@ async def handle_websocket_connection(
                     
                     if code_changes_received and session_id:
                         await sync_files_to_session(session_id, code_changes_received)
+                        
+                        new_imports = set()
+                        for change in code_changes_received:
+                            if change.get("action") != "delete" and change.get("content"):
+                                new_imports.update(extract_npm_imports(change["content"]))
+                        
+                        if new_imports:
+                            await _safe_send(websocket, {
+                                "type": "packages_installed",
+                                "packages": sorted(new_imports)
+                            })
                     
             except Exception as e:
                 logger.error(f"Error streaming LLM response: {e}")

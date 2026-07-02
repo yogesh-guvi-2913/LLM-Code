@@ -203,3 +203,18 @@ async def create_test(request: CreateTestRequest):
         mongo.insertOne(test_doc)
 
     return {"success": True, "testId": request.testId, "filesCount": len(project["files"])}
+
+
+@router.post("/session/execute")
+async def execute_command(requestBody: dict):
+    _validate_auth(requestBody.get("authToken"))
+
+    session_id = requestBody.get("sessionId")
+    command = requestBody.get("command")
+    service = requestBody.get("service", "frontend")
+
+    if not session_id or not command:
+        raise HTTPException(status_code=400, detail="sessionId and command required")
+
+    result = await docker_orchestrator.execute_command(session_id, command, service)
+    return result

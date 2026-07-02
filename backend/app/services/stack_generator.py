@@ -120,8 +120,6 @@ def _gen_compose(frontend: str, backend: str, database: str, cache: str, worker:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - VITE_API_URL=/api
     command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
     networks:
       - session-net

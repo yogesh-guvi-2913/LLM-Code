@@ -34,7 +34,16 @@ Rules:
 - Include proper imports in all files
 - Only output file blocks for files you want to CREATE or UPDATE
 - To DELETE a file, use: ```delete:PATH```
-- Do NOT output docker-compose.yml, Dockerfile, or config files unless specifically asked"""
+- NEVER output docker-compose.yml, Dockerfile, nginx.conf, webpack config, vite config, or any infra/config files
+- NEVER tell the user to run terminal commands (npm install, docker build, etc.). The system auto-installs packages.
+- NEVER suggest rebuilding containers or restarting services
+- CRITICAL: ALL code MUST be inside ```file:PATH``` blocks. NEVER show raw code outside of file blocks.
+- CRITICAL: NEVER use plain ``` blocks. Always use ```file:PATH``` format.
+- CRITICAL: Keep explanations short and concise. Focus on what you're building, not implementation details.
+- CRITICAL: Do NOT repeat code that was already shown. Only output changed files.
+- CRITICAL: If you use react-router-dom (Link, Route, Routes, useNavigate, etc.), you MUST wrap the entire App in <BrowserRouter> inside main.jsx. Always output the updated main.jsx when adding routing.
+- CRITICAL: Every component you reference must exist. If you import a component, create it in the same response.
+- CRITICAL: Only use these npm packages which are safe to use: react, react-dom, react-router-dom, axios, lucide-react, framer-motion, recharts, date-fns, clsx, tailwind-merge. If you need any other package, ask the user first."""
 
 def build_system_prompt(
     problem_name: str,
@@ -103,7 +112,9 @@ def parse_ai_response(response_text: str) -> tuple[str, list]:
         })
     
     clean_pattern = r'```(?:file|delete):[^\n]+\n?.*?```'
-    message = re.sub(clean_pattern, '', response_text, flags=re.DOTALL).strip()
+    plain_code_pattern = r'```[a-z]*\n?[\s\S]*?```'
+    message = re.sub(clean_pattern, '', response_text, flags=re.DOTALL)
+    message = re.sub(plain_code_pattern, '', message).strip()
     
     return message, file_changes
 

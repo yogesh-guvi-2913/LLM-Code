@@ -8,8 +8,24 @@ const stripCodeBlocks = (text) => {
   return text
     .replace(/```(?:file|delete):[^\n]+\n[\s\S]*?```/g, '')
     .replace(/```(?:file|delete):[^\n]+```/g, '')
+    .replace(/```\w*\n[\s\S]*?```/g, '')
+    .replace(/```(?:file|delete):[^\n]*\n[\s\S]*$/g, '')
+    .replace(/```\w*\n[\s\S]*$/g, '')
+    .replace(/```\w*$/g, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+};
+
+const extractFileOperations = (text) => {
+  const operations = [];
+  const fileBlockRegex = /```(file|delete):([^\n]+)\n?/g;
+  let match;
+  while ((match = fileBlockRegex.exec(text)) !== null) {
+    const action = match[1];
+    const path = match[2].trim();
+    operations.push({ action, path });
+  }
+  return operations;
 };
 
 const getLanguageFromPath = (path) => {
@@ -240,7 +256,8 @@ export function TestProvider({ testId, authToken, navigate, children }) {
             updated[updated.length - 1] = {
               ...last,
               rawContent,
-              content: stripCodeBlocks(rawContent)
+              content: stripCodeBlocks(rawContent),
+              files: extractFileOperations(rawContent)
             };
             return updated;
           }
@@ -248,8 +265,23 @@ export function TestProvider({ testId, authToken, navigate, children }) {
             role: 'assistant',
             rawContent: text,
             content: stripCodeBlocks(text) || 'Working on it...',
-            streaming: true
+            streaming: true,
+            files: extractFileOperations(text)
           }];
+        });
+      },
+      onPackagesInstalled: (packages) => {
+        setChatMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last && last.role === 'assistant') {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              ...last,
+              installedPackages: [...(last.installedPackages || []), ...packages]
+            };
+            return updated;
+          }
+          return prev;
         });
       },
       onDone: () => {
@@ -261,9 +293,9 @@ export function TestProvider({ testId, authToken, navigate, children }) {
             updated[updated.length - 1] = {
               ...last,
               streaming: false,
-              content: cleanContent || 'Done! Code has been applied to your files.'
+              content: cleanContent || 'Done! Code has been applied to your files.',
+              files: extractFileOperations(last.rawContent || '')
             };
-            delete updated[updated.length - 1].rawContent;
             return updated;
           }
           return prev;
@@ -473,6 +505,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
     wsConnected,
     sessionInfo,
     sessionStatus,
+    authToken,
   };
 
   return (

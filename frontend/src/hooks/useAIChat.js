@@ -69,6 +69,9 @@ export function useAIChat({ testId, authToken, sessionId, onCodeChanges, onError
         case 'sync':
           cb?.onSync?.(content);
           break;
+        case 'packages_installed':
+          cb?.onPackagesInstalled?.(data.packages || []);
+          break;
         case 'done':
           setIsStreaming(false);
           cb?.onDone?.();

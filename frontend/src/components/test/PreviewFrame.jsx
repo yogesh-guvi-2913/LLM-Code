@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useTest } from '../../contexts/TestContext';
 import { Maximize2, RefreshCw, Smartphone, Monitor, Loader2, AlertCircle } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
+// const PREVIEW_BASE_URL = import.meta.env.VITE_PREVIEW_BASE_URL || window.location.origin;
+const PREVIEW_BASE_URL = 'http://localhost'
 function PreviewFrame() {
   const { sessionInfo, sessionStatus } = useTest();
   const [viewport, setViewport] = useState('desktop');
@@ -16,7 +16,7 @@ function PreviewFrame() {
 
   const handleExpand = () => {
     if (sessionInfo?.frontendUrl) {
-      window.open(`${API_BASE_URL}${sessionInfo.frontendUrl}`, '_blank');
+      window.open(`${PREVIEW_BASE_URL}${sessionInfo.frontendUrl}`, '_blank');
     }
   };
 
@@ -45,7 +45,7 @@ function PreviewFrame() {
     );
   }
 
-  const previewUrl = `${API_BASE_URL}${sessionInfo.frontendUrl}`;
+  const previewUrl = `${PREVIEW_BASE_URL}${sessionInfo.frontendUrl}`;
   const viewportWidth = viewport === 'mobile' ? '375px' : '100%';
 
   return (

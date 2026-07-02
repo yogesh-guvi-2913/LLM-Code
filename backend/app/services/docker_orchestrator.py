@@ -307,3 +307,38 @@ class DockerOrchestrator:
                     except (UnicodeDecodeError, PermissionError):
                         pass
         return files
+
+    async def execute_command(self, session_id: str, command: str, service: str = "frontend") -> Dict[str, Any]:
+        containers = self._get_session_containers(session_id)
+        if not containers:
+            return {"success": False, "error": "No running containers found"}
+
+        target_container = None
+        for container in containers:
+            if service in container:
+                target_container = container
+                break
+
+        if not target_container:
+            return {"success": False, "error": f"No container found for service: {service}"}
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "docker", "exec", target_container,
+                "sh", "-c", command,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=60)
+
+            return {
+                "success": proc.returncode == 0,
+                "stdout": stdout.decode("utf-8", errors="replace").strip(),
+                "stderr": stderr.decode("utf-8", errors="replace").strip(),
+                "exitCode": proc.returncode,
+                "container": target_container,
+            }
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Command timed out"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}

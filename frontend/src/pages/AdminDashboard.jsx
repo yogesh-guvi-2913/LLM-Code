@@ -15,10 +15,12 @@ import {
   Database,
   Zap,
   Cpu,
+  Users,
+  Link2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const CATEGORY_META = {
   frontend: { label: 'Frontend', icon: Monitor, color: 'sky' },
@@ -72,6 +74,12 @@ function AdminDashboard() {
   const [newRequirement, setNewRequirement] = useState({ title: '', description: '' });
   const [newCheck, setNewCheck] = useState({ type: 'element_exists', selector: '', points: 10 });
 
+  const [mapperLoading, setMapperLoading] = useState(false);
+  const [mapperUsers, setMapperUsers] = useState([]);
+  const [mapperTests, setMapperTests] = useState([]);
+  const [mapperMappings, setMapperMappings] = useState([]);
+  const [mapperForm, setMapperForm] = useState({ hash: '', testId: '' });
+
   useEffect(() => {
     fetch(`${API_BASE_URL}/admin/stacks/available`)
       .then((res) => res.json())
@@ -113,6 +121,113 @@ function AdminDashboard() {
     const timer = setTimeout(generatePreview, 400);
     return () => clearTimeout(timer);
   }, [generatePreview]);
+
+  const loadMapperData = async () => {
+    setMapperLoading(true);
+    try {
+      const [usersRes, testsRes, mappingsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/test-mapper/users`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authToken: user?.authToken || '' }),
+        }),
+        fetch(`${API_BASE_URL}/admin/test-mapper/tests`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authToken: user?.authToken || '' }),
+        }),
+        fetch(`${API_BASE_URL}/admin/test-mapper/list`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authToken: user?.authToken || '' }),
+        }),
+      ]);
+
+      const [usersData, testsData, mappingsData] = await Promise.all([
+        usersRes.json(),
+        testsRes.json(),
+        mappingsRes.json(),
+      ]);
+
+      if (usersData.success) setMapperUsers(usersData.users || []);
+      if (testsData.success) setMapperTests(testsData.tests || []);
+      if (mappingsData.success) setMapperMappings(mappingsData.mappings || []);
+    } catch (err) {
+      toast.error('Failed to load mapper data: ' + err.message);
+    } finally {
+      setMapperLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'mapper') {
+      loadMapperData();
+    }
+  }, [activeTab, user?.authToken]);
+
+  const handleAssignTest = async () => {
+    if (!mapperForm.hash || !mapperForm.testId) {
+      toast.error('Select both user and test');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/test-mapper/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authToken: user?.authToken || '',
+          hash: mapperForm.hash,
+          testId: mapperForm.testId,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.existing ? 'Mapping already exists' : 'Test assigned to user');
+        setMapperForm({ hash: '', testId: '' });
+        loadMapperData();
+      } else {
+        toast.error(data.detail || 'Failed to assign test');
+      }
+    } catch (err) {
+      toast.error('Failed: ' + err.message);
+    }
+  };
+
+  const handleRemoveMapping = async (hash, testId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/test-mapper/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authToken: user?.authToken || '',
+          hash,
+          testId,
+        }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success('Mapping removed');
+        loadMapperData();
+      } else {
+        toast.error(data.detail || 'Failed to remove mapping');
+      }
+    } catch (err) {
+      toast.error('Failed: ' + err.message);
+    }
+  };
+
+  const getUserName = (hash) => {
+    const user = mapperUsers.find((u) => u.hash === hash);
+    return user ? (user.name || user.email || hash.slice(0, 12) + '...') : hash.slice(0, 12) + '...';
+  };
+
+  const getTestName = (testId) => {
+    const test = mapperTests.find((t) => t.testId === testId);
+    return test ? test.name : testId;
+  };
 
   const selectStack = (category, stackId) => {
     setTechStack((prev) => ({
@@ -273,6 +388,7 @@ function AdminDashboard() {
         <div className="flex gap-2 mb-6">
           {[
             { id: 'create', label: 'Create Test', icon: Plus },
+            { id: 'mapper', label: 'Test Mapper', icon: Link2 },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map((tab) => (
             <button
@@ -561,6 +677,121 @@ function AdminDashboard() {
           <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
             <h2 className="text-lg font-medium mb-4">Platform Settings</h2>
             <p className="text-gray-500 text-sm">Configuration options coming soon...</p>
+          </div>
+        )}
+
+        {activeTab === 'mapper' && (
+          <div className="space-y-6">
+            <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Users size={18} className="text-violet-400" />
+                <h2 className="text-lg font-medium">Assign Test to User</h2>
+              </div>
+
+              {mapperLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-500">
+                  <Loader2 size={20} className="animate-spin mr-2" /> Loading...
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Select User</label>
+                    <select
+                      value={mapperForm.hash}
+                      onChange={(e) => setMapperForm((prev) => ({ ...prev, hash: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-violet-500/50"
+                    >
+                      <option value="">-- Select User --</option>
+                      {mapperUsers.map((u) => (
+                        <option key={u.hash} value={u.hash}>
+                          {u.name || u.email || u.hash.slice(0, 12)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-400 mb-1">Select Test</label>
+                    <select
+                      value={mapperForm.testId}
+                      onChange={(e) => setMapperForm((prev) => ({ ...prev, testId: e.target.value }))}
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-violet-500/50"
+                    >
+                      <option value="">-- Select Test --</option>
+                      {mapperTests.map((t) => (
+                        <option key={t.testId} value={t.testId}>
+                          {t.name || t.testId}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleAssignTest}
+                      disabled={!mapperForm.hash || !mapperForm.testId}
+                      className="w-full py-2 bg-violet-500 text-white rounded-lg font-medium hover:bg-violet-600 transition-colors disabled:opacity-50"
+                    >
+                      Assign Test
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Link2 size={18} className="text-violet-400" />
+                  <h2 className="text-lg font-medium">Current Mappings</h2>
+                </div>
+                <span className="text-sm text-gray-500">{mapperMappings.length} mappings</span>
+              </div>
+
+              {mapperLoading ? (
+                <div className="flex items-center justify-center py-8 text-gray-500">
+                  <Loader2 size={20} className="animate-spin mr-2" /> Loading...
+                </div>
+              ) : mapperMappings.length === 0 ? (
+                <div className="text-center py-8 text-gray-600 text-sm">No test mappings found</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-left text-sm text-gray-500 border-b border-white/10">
+                        <th className="pb-2 pr-4">User</th>
+                        <th className="pb-2 pr-4">Test</th>
+                        <th className="pb-2 pr-4">Assigned At</th>
+                        <th className="pb-2"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mapperMappings.map((m, idx) => (
+                        <tr key={idx} className="border-b border-white/5">
+                          <td className="py-3 pr-4">
+                            <span className="text-white">{getUserName(m.hash)}</span>
+                            <span className="block text-xs text-gray-500 font-mono">{m.hash.slice(0, 16)}...</span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <span className="text-white">{getTestName(m.testId)}</span>
+                            <span className="block text-xs text-gray-500">{m.testId}</span>
+                          </td>
+                          <td className="py-3 pr-4 text-sm text-gray-400">
+                            {m.assignedAt ? new Date(m.assignedAt).toLocaleDateString() : '-'}
+                          </td>
+                          <td className="py-3">
+                            <button
+                              onClick={() => handleRemoveMapping(m.hash, m.testId)}
+                              className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

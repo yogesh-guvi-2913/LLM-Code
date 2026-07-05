@@ -1,3 +1,4 @@
+from __future__ import annotations
 from icecream.icecream import ic
 import json, datetime, time, hashlib, random, base64, io, boto3
 from botocore.config import Config

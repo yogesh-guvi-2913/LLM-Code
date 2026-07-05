@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { Terminal as TerminalIcon, Trash2, ChevronDown, ChevronUp, Server, AlertCircle } from 'lucide-react';
 import { useTest } from '../../contexts/TestContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const WS_BASE_URL = API_BASE_URL ? API_BASE_URL.replace(/^http/, 'ws') : `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}`;
 
 function TerminalPanel() {
   const {

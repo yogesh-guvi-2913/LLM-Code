@@ -1,0 +1,28 @@
+# compiled binaries (build/ also holds source: sandbox-images/, toolbox/)
+/build/orchestrator
+/build/node-agent
+/build/toolbox/toolbox
+/node-agent
+/orchestrator
+/toolbox
+
+# dashboard
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+# NOTE: internal/dashboard/dist (the embedded copy) IS committed — a plain
+# `go build ./cmd/orchestrator` must produce the full product.
+
+# python sdk
+sdk/python/.venv/
+sdk/python/dist/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# internal planning docs, not part of the public project
+/PRODUCTION.md
+/docs/economics-explainer.html
+
+# misc
+.DS_Store

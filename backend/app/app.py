@@ -10,6 +10,9 @@ from app.routes.auth.auth import router as auth
 from app.routes.dashboard.dashboard import router as dashboard
 from app.routes.evaluation.routes import router as evaluation
 from app.routes.session.routes import router as session
+from app.routes.session.flash_routes import router as flash_session
+from app.routes.health import router as health
+from app.routes.metrics import router as metrics
 from app.routes.ai.chat import handle_websocket_connection
 
 initLogging()
@@ -18,8 +21,21 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting application...")
-    initMongoSchema()
+    try:
+        initMongoSchema()
+    except Exception as e:
+        logger.warning(f"MongoDB init skipped (non-fatal): {e}")
+    
+    from app.database.postgres_client import postgres_client
+    try:
+        await postgres_client.connect()
+        logger.info("PostgreSQL connected successfully")
+    except Exception as e:
+        logger.warning(f"PostgreSQL connection failed: {e}")
+    
     yield
+    
+    await postgres_client.close()
     logger.info("Stopping application...")
 
 app = FastAPI(lifespan=lifespan)
@@ -37,6 +53,9 @@ app.include_router(auth)
 app.include_router(dashboard)
 app.include_router(evaluation)
 app.include_router(session)
+app.include_router(flash_session)
+app.include_router(health)
+app.include_router(metrics)
 
 
 @app.websocket("/ws/ai-chat/{test_id}")

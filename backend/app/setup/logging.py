@@ -1,4 +1,5 @@
 import logging
+import logging.config
 import app.config as config
 from pythonjsonlogger import jsonlogger # this is not technically used here, but required for the JSON formatter at runtime
 

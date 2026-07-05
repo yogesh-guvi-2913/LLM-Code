@@ -23,3 +23,7 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY")
 BEDROCK_BASE_URL = os.getenv("BEDROCK_BASE_URL")
 BEDROCK_MODEL = os.getenv("BEDROCK_MODEL", "zai.glm-4.7")
+
+# PostgreSQL Configuration
+POSTGRES_DB = os.getenv("POSTGRES_DB", "llmcode")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@127.0.0.1:5432/llmcode")

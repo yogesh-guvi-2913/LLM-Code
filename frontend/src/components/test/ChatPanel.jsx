@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Play, Wifi, WifiOff, Lightbulb, Loader2, CheckCircle, Package } from 'lucide-react';
 import { useTest } from '../../contexts/TestContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 function extractPackageName(command) {
   const match = command.match(/(?:npm install|npm i|yarn add|pnpm add)\s+(?:-S\s+|-D\s+)?(.+)/);

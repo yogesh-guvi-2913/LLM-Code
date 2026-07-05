@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Control-plane bootstrap. The orchestrator binary is baked into control_ami_id
+# (or pulled here). It runs in CLUSTER mode — no Docker on this box — scheduling
+# sandboxes across the node-agent fleet over Redis.
+set -euo pipefail
+
+cat >/etc/hyrenet/orchestrator.env <<EOF
+CLUSTER_MODE=true
+DATABASE_URL=${database_url}
+REDIS_URL=${redis_url}
+LISTEN_ADDR=:8090
+PREVIEW_DOMAIN=preview.${domain}
+PREVIEW_PORT=443
+AUTH_ENABLED=true
+SANDBOXES_PER_NODE=${sandboxes_per_node}
+LOG_LEVEL=info
+# The planner publishes Hyrenet/RequiredNodes and drives this ASG's desired count.
+ASG_NAME=${node_asg_name}
+AWS_REGION=${region}
+EOF
+
+systemctl enable --now hyrenet-orchestrator

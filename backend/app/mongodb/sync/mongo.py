@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from app.mongodb.sync.config import get_mongo_client
 from app.config import MONGO_DB

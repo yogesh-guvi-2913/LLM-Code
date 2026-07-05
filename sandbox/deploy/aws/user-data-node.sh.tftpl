@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Node-agent bootstrap. node_ami_id is the golden AMI: Docker + gVisor (runsc) +
+# the sandbox images already pulled, so a fresh node is ready in ~60-90s (L3), not
+# a multi-minute image pull at 10:00.
+set -euo pipefail
+
+TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+IID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+PRIV_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+
+cat >/etc/hyrenet/node-agent.env <<EOF
+NODE_ID=$IID
+NODE_HOST=$PRIV_IP
+NODE_ADDR=http://$PRIV_IP:9001
+NODE_LISTEN=:9001
+REDIS_URL=${redis_url}
+SANDBOX_RUNTIME=runsc
+PREVIEW_PORT=443
+NODE_DRAIN_TIMEOUT_SEC=${drain_timeout_sec}
+EOF
+
+systemctl enable --now hyrenet-node-agent
+
+# Drain hook: when the ASG puts this instance into Terminating:Wait (scale-in), a
+# SIGTERM lets the node-agent finish its ACTIVE sessions before the box dies, then
+# we complete the lifecycle action so the ASG proceeds.
+cat >/usr/local/bin/hyrenet-drain.sh <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+systemctl stop hyrenet-node-agent   # SIGTERM → node-agent drains active sessions
+TOKEN=$(curl -sX PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+IID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)
+ASG=$(aws autoscaling describe-auto-scaling-instances --instance-ids "$IID" --region "$REGION" \
+        --query 'AutoScalingInstances[0].AutoScalingGroupName' --output text)
+aws autoscaling complete-lifecycle-action --region "$REGION" \
+  --lifecycle-hook-name drain --auto-scaling-group-name "$ASG" \
+  --instance-id "$IID" --lifecycle-action-result CONTINUE
+EOF
+chmod +x /usr/local/bin/hyrenet-drain.sh

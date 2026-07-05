@@ -23,7 +23,7 @@ const Home = () => {
       setIsLoadingTests(true);
 
       try {
-        const response = await fetch('http://localhost:8000/dashboard', {
+        const response = await fetch('/dashboard', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -80,7 +80,7 @@ const Home = () => {
     setIsLoggingOut(true);
 
     try {
-      const response = await fetch('http://localhost:8000/logout', {
+      const response = await fetch('/logout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -461,9 +461,11 @@ const Home = () => {
                         Select a test to evaluate your AI model
                       </p>
                     </div>
+                    {user?.role === 'admin' && (
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
+                      onClick={() => navigate('/admin')}
                       className="px-4 py-2 rounded-lg text-white font-medium flex items-center gap-2 transition-all duration-200"
                       style={{
                         backgroundColor: 'rgba(139,92,246,0.15)',
@@ -481,6 +483,7 @@ const Home = () => {
                       <Plus size={16} />
                       <span>Create Test</span>
                     </motion.button>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -15,6 +15,10 @@ import {
   Database,
   Zap,
   Cpu,
+  Box,
+  Activity,
+  Play,
+  Pause,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -72,8 +76,15 @@ function AdminDashboard() {
   const [newRequirement, setNewRequirement] = useState({ title: '', description: '' });
   const [newCheck, setNewCheck] = useState({ type: 'element_exists', selector: '', points: 10 });
 
+  const [flashTemplates, setFlashTemplates] = useState([]);
+  const [flashEnabled, setFlashEnabled] = useState(false);
+  const [loadingFlashTemplates, setLoadingFlashTemplates] = useState(false);
+  const [selectedFlashTemplate, setSelectedFlashTemplate] = useState(null);
+  const [flashScoringEnabled, setFlashScoringEnabled] = useState(true);
+  const [scalingTemplate, setScalingTemplate] = useState(null);
+
   useEffect(() => {
-    fetch(`${API_BASE_URL}/v1/admin/stacks/available`)
+    fetch(`${API_BASE_URL}/admin/stacks/available`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.stacks) {
@@ -83,6 +94,48 @@ function AdminDashboard() {
       .catch(() => toast.error('Failed to load available stacks'))
       .finally(() => setLoadingStacks(false));
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'templates' || activeTab === 'create') {
+      fetchFlashTemplates();
+    }
+  }, [activeTab]);
+
+  const fetchFlashTemplates = async () => {
+    setLoadingFlashTemplates(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/flash/templates`);
+      const data = await res.json();
+      setFlashEnabled(data.enabled);
+      if (data.success && data.templates) {
+        setFlashTemplates(data.templates);
+      }
+    } catch (err) {
+      console.error('Failed to fetch Flash templates:', err);
+    } finally {
+      setLoadingFlashTemplates(false);
+    }
+  };
+
+  const handleScaleTemplate = async (templateId, newMinWarm) => {
+    setScalingTemplate(templateId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/flash/templates/${templateId}/scale`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ min_warm: newMinWarm }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`Scaled ${templateId} to ${newMinWarm} warm containers`);
+        fetchFlashTemplates();
+      }
+    } catch (err) {
+      toast.error('Failed to scale template');
+    } finally {
+      setScalingTemplate(null);
+    }
+  };
 
   const generatePreview = useCallback(async () => {
     const hasSelection = Object.values(techStack).some((v) => v);
@@ -128,26 +181,30 @@ function AdminDashboard() {
     }
 
     const hasStack = Object.values(techStack).some((v) => v);
-    if (!hasStack) {
-      toast.error('Select at least one technology');
+    const hasFlashTemplate = selectedFlashTemplate !== null;
+
+    if (!hasStack && !hasFlashTemplate) {
+      toast.error('Select a technology stack or a Flash template');
       return;
     }
 
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/v1/admin/test/create`, {
+      const res = await fetch(`${API_BASE_URL}/admin/test/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           authToken: user?.authToken || '',
           ...testConfig,
           techStack,
+          flashTemplateId: selectedFlashTemplate,
+          flashScoringEnabled: hasFlashTemplate ? flashScoringEnabled : false,
         }),
       });
       const data = await res.json();
 
       if (data.success) {
-        toast.success(`Test created with ${data.filesCount} files`);
+        toast.success(`Test created with ${data.filesCount} files${data.flashTemplate ? ` (Flash: ${data.flashTemplate})` : ''}`);
         setTestConfig({
           testId: '',
           name: '',
@@ -157,6 +214,8 @@ function AdminDashboard() {
           requirements: [],
           checks: [],
         });
+        setSelectedFlashTemplate(null);
+        setFlashScoringEnabled(true);
       } else {
         toast.error(data.detail || 'Failed to create test');
       }
@@ -273,6 +332,7 @@ function AdminDashboard() {
         <div className="flex gap-2 mb-6">
           {[
             { id: 'create', label: 'Create Test', icon: Plus },
+            { id: 'templates', label: 'Sandbox Templates', icon: Box },
             { id: 'settings', label: 'Settings', icon: Settings },
           ].map((tab) => (
             <button
@@ -286,6 +346,11 @@ function AdminDashboard() {
             >
               <tab.icon size={16} />
               {tab.label}
+              {tab.id === 'templates' && flashTemplates.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-violet-500/20 rounded">
+                  {flashTemplates.length}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -294,11 +359,82 @@ function AdminDashboard() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* LEFT: Stack selector + test config */}
             <div className="space-y-6">
+              {/* Flash Template Selector */}
+              {flashEnabled && flashTemplates.length > 0 && (
+                <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Box size={18} className="text-emerald-400" />
+                    <h2 className="text-lg font-medium">Flash Sandbox Templates</h2>
+                    <span className="text-xs text-gray-500 ml-auto">Optional</span>
+                  </div>
+                  <p className="text-sm text-gray-400 mb-4">
+                    Select a pre-built sandbox template for instant starter code and automated scoring.
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    {flashTemplates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => setSelectedFlashTemplate(
+                          selectedFlashTemplate === template.id ? null : template.id
+                        )}
+                        className={`relative px-4 py-3 rounded-lg border text-left transition-all ${
+                          selectedFlashTemplate === template.id
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                            : 'border-white/10 bg-white/[0.02] text-gray-400 hover:border-white/20 hover:text-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium">{template.id}</span>
+                          {selectedFlashTemplate === template.id && (
+                            <CheckCircle size={14} className="flex-shrink-0" />
+                          )}
+                        </div>
+                        <span className="text-xs opacity-60">{template.language}</span>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            template.kind === 'frontend' 
+                              ? 'bg-sky-500/20 text-sky-300' 
+                              : 'bg-amber-500/20 text-amber-300'
+                          }`}>
+                            {template.kind}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {template.warm_count} warm
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {selectedFlashTemplate && (
+                    <div className="mt-4 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          id="flashScoring"
+                          checked={flashScoringEnabled}
+                          onChange={(e) => setFlashScoringEnabled(e.target.checked)}
+                          className="rounded border-gray-600 bg-gray-700 text-violet-500 focus:ring-violet-500"
+                        />
+                        <label htmlFor="flashScoring" className="text-sm text-gray-300">
+                          Enable automated Flash scoring
+                        </label>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        When enabled, submissions will be automatically scored using the template's test harness.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Tech Stack Selector */}
               <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Layers size={18} className="text-violet-400" />
                   <h2 className="text-lg font-medium">Tech Stack</h2>
+                  {selectedFlashTemplate && (
+                    <span className="text-xs text-gray-500 ml-auto">Optional (template selected)</span>
+                  )}
                 </div>
                 {renderStackSelector()}
               </div>
@@ -561,6 +697,117 @@ function AdminDashboard() {
           <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
             <h2 className="text-lg font-medium mb-4">Platform Settings</h2>
             <p className="text-gray-500 text-sm">Configuration options coming soon...</p>
+          </div>
+        )}
+
+        {activeTab === 'templates' && (
+          <div className="space-y-6">
+            {/* Flash Status */}
+            <div className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity size={18} className={flashEnabled ? 'text-emerald-400' : 'text-gray-500'} />
+                  <h2 className="text-lg font-medium">Flash Sandbox Engine</h2>
+                </div>
+                <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm ${
+                  flashEnabled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-400'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${flashEnabled ? 'bg-emerald-400' : 'bg-gray-400'}`} />
+                  {flashEnabled ? 'Connected' : 'Disconnected'}
+                </div>
+              </div>
+              {!flashEnabled && (
+                <p className="text-sm text-gray-500">
+                  Flash sandbox engine is not available. Start the Flash orchestrator on localhost:8090.
+                </p>
+              )}
+            </div>
+
+            {/* Templates Grid */}
+            {loadingFlashTemplates ? (
+              <div className="flex items-center justify-center py-12 text-gray-500">
+                <Loader2 size={20} className="animate-spin mr-2" /> Loading templates...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {flashTemplates.map((template) => (
+                  <div
+                    key={template.id}
+                    className="bg-white/[0.02] rounded-xl border border-white/[0.06] p-6"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-medium text-white">{template.title}</h3>
+                        <p className="text-sm text-gray-400">{template.language}</p>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded ${
+                        template.kind === 'frontend'
+                          ? 'bg-sky-500/20 text-sky-300'
+                          : 'bg-amber-500/20 text-amber-300'
+                      }`}>
+                        {template.kind}
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+                      {template.description}
+                    </p>
+
+                    <div className="flex items-center justify-between text-sm mb-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1">
+                          <Play size={14} className="text-emerald-400" />
+                          <span className="text-gray-300">{template.warm_count}</span>
+                          <span className="text-gray-500">warm</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-gray-500">min:</span>
+                          <span className="text-gray-300">{template.min_warm}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scale Control */}
+                    <div className="border-t border-white/10 pt-4">
+                      <label className="text-xs text-gray-500 mb-2 block">Scale Warm Pool</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="0"
+                          max="10"
+                          value={template.min_warm}
+                          onChange={(e) => {
+                            const newVal = parseInt(e.target.value);
+                            if (newVal !== template.min_warm) {
+                              handleScaleTemplate(template.id, newVal);
+                            }
+                          }}
+                          disabled={scalingTemplate === template.id}
+                          className="flex-1 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
+                        />
+                        <span className="w-8 text-center text-sm text-gray-300">
+                          {template.min_warm}
+                        </span>
+                      </div>
+                      {scalingTemplate === template.id && (
+                        <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                          <Loader2 size={12} className="animate-spin" />
+                          Scaling...
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {flashEnabled && flashTemplates.length === 0 && !loadingFlashTemplates && (
+              <div className="text-center py-12 text-gray-500">
+                <Box size={40} className="mx-auto mb-3 opacity-30" />
+                <p>No Flash templates available</p>
+                <p className="text-sm mt-1">Create templates in the Flash dashboard or via API</p>
+              </div>
+            )}
           </div>
         )}
       </main>

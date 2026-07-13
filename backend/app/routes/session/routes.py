@@ -12,6 +12,7 @@ from app.services.docker_orchestrator import DockerOrchestrator
 from app.services.file_sync import sync_files_to_session
 from app.services.nginx_config import create_session_config, remove_session_config
 from app.services.stack_generator import generate_project, AVAILABLE_STACKS
+from app.services.flash_service import FlashClient, FlashTemplate, is_flash_enabled
 from app.redis.sync.rediscache import RedisCache
 from app.mongodb.sync.mongo import MongoDB
 
@@ -158,6 +159,48 @@ async def list_available_stacks():
     return {"success": True, "stacks": AVAILABLE_STACKS}
 
 
+@router.get("/admin/flash/templates")
+async def list_flash_templates_for_admin():
+    """List available Flash templates for test creation."""
+    if not is_flash_enabled():
+        return {"success": False, "enabled": False, "templates": [], "message": "Flash integration disabled"}
+    
+    try:
+        flash_client = FlashClient()
+        templates = flash_client.list_templates()
+        stats = flash_client.get_stats()
+        
+        warm_counts = stats.get("warm", {})
+        
+        result = []
+        for t in templates:
+            result.append({
+                "id": t.id,
+                "title": t.title,
+                "language": t.language,
+                "kind": t.kind,
+                "description": t.description,
+                "min_warm": t.min_warm,
+                "warm_count": warm_counts.get(t.id, 0),
+                "image": t.image,
+            })
+        
+        return {
+            "success": True, 
+            "enabled": True, 
+            "templates": result
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list Flash templates: {e}")
+        return {
+            "success": False, 
+            "enabled": True, 
+            "templates": [], 
+            "message": str(e)
+        }
+
+
 @router.post("/admin/stacks/generate")
 async def generate_stack_project(requestBody: dict):
     _validate_auth(requestBody.get("authToken"))
@@ -179,8 +222,61 @@ async def create_test(request: CreateTestRequest):
     mongo.selectCollection("tests")
 
     existing = mongo.find({"testId": request.testId}, limit=1)
-
-    project = generate_project(request.techStack) if request.techStack else {"files": {}, "meta": {}, "composeContent": ""}
+    
+    flash_template = None
+    flash_initial_files = {}
+    
+    if request.flashTemplateId:
+        if not is_flash_enabled():
+            raise HTTPException(status_code=503, detail="Flash integration is disabled")
+        
+        try:
+            flash_client = FlashClient()
+            flash_template = flash_client.get_template(request.flashTemplateId)
+            
+            if not flash_template:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"Flash template '{request.flashTemplateId}' not found"
+                )
+            
+            sandbox = flash_client.create_sandbox(
+                template_id=request.flashTemplateId,
+                timeout_seconds=60,
+                metadata={"purpose": "template_extraction", "testId": request.testId}
+            )
+            
+            try:
+                files = flash_client.list_files(sandbox.id)
+                for file_path in files:
+                    if file_path.startswith("src/") or file_path.startswith("template/"):
+                        content = flash_client.read_file(sandbox.id, file_path)
+                        flash_initial_files[file_path] = content
+            finally:
+                flash_client.kill_sandbox(sandbox.id)
+            
+            logger.info(f"Extracted {len(flash_initial_files)} files from Flash template {request.flashTemplateId}")
+            
+        except Exception as e:
+            logger.error(f"Failed to get Flash template: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to get Flash template: {str(e)}")
+    
+    if flash_template:
+        project = {
+            "files": flash_initial_files,
+            "meta": {
+                "template": flash_template.id,
+                "language": flash_template.language,
+                "kind": flash_template.kind,
+            },
+            "composeContent": "",
+        }
+    else:
+        project = generate_project(request.techStack) if request.techStack else {
+            "files": {}, 
+            "meta": {}, 
+            "composeContent": ""
+        }
 
     test_doc = {
         "testId": request.testId,
@@ -195,6 +291,15 @@ async def create_test(request: CreateTestRequest):
         "composeContent": project["composeContent"],
         "projectMeta": project["meta"],
         "initialFiles": {},
+        "flashTemplateId": request.flashTemplateId,
+        "flashScoringEnabled": request.flashScoringEnabled if request.flashTemplateId else False,
+        "flashTemplateMeta": {
+            "id": flash_template.id,
+            "title": flash_template.title,
+            "language": flash_template.language,
+            "kind": flash_template.kind,
+            "image": flash_template.image,
+        } if flash_template else None,
     }
 
     if existing:
@@ -202,7 +307,12 @@ async def create_test(request: CreateTestRequest):
     else:
         mongo.insertOne(test_doc)
 
-    return {"success": True, "testId": request.testId, "filesCount": len(project["files"])}
+    return {
+        "success": True, 
+        "testId": request.testId, 
+        "filesCount": len(project["files"]),
+        "flashTemplate": request.flashTemplateId
+    }
 
 
 @router.post("/session/execute")

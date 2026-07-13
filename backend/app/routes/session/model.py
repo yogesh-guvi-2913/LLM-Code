@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Dict, Any, List
+from pydantic import BaseModel, Field
+from typing import Dict, Any, List, Optional
 
 
 class SessionStartRequest(BaseModel):
@@ -33,3 +33,5 @@ class CreateTestRequest(BaseModel):
     requirements: List[Dict[str, Any]] = []
     checks: List[Dict[str, Any]] = []
     techStack: Dict[str, str] = {}
+    flashTemplateId: Optional[str] = Field(default=None, description="Flash sandbox template ID")
+    flashScoringEnabled: bool = Field(default=True, description="Enable Flash automated scoring")

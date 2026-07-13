@@ -23,7 +23,7 @@ const Home = () => {
       setIsLoadingTests(true);
 
       try {
-        const response = await fetch('http://localhost:8000/dashboard', {
+        const response = await fetch('http://localhost:8000/v1/dashboard', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -80,7 +80,7 @@ const Home = () => {
     setIsLoggingOut(true);
 
     try {
-      const response = await fetch('http://localhost:8000/logout', {
+      const response = await fetch('http://localhost:8000/v1/logout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

@@ -23,3 +23,8 @@ S3_BUCKET = os.getenv("S3_BUCKET")
 BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY")
 BEDROCK_BASE_URL = os.getenv("BEDROCK_BASE_URL")
 BEDROCK_MODEL = os.getenv("BEDROCK_MODEL", "zai.glm-4.7")
+
+# Flash Sandbox Engine Configurations
+FLASH_API_URL = os.getenv("FLASH_API_URL", "http://localhost:8090")
+FLASH_API_KEY = os.getenv("FLASH_API_KEY", "")
+FLASH_ENABLED = os.getenv("FLASH_ENABLED", "true").lower() == "true"

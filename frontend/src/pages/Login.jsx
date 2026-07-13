@@ -88,8 +88,8 @@ const Login = () => {
     }
 
     const apiUrl = isLoginMode
-      ? 'http://localhost:8000/login'
-      : 'http://localhost:8000/register';
+      ? 'http://localhost:8000/v1/login'
+      : 'http://localhost:8000/v1/register';
 
     try {
       const payload = isLoginMode

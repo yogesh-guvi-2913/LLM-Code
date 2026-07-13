@@ -73,7 +73,7 @@ function AdminDashboard() {
   const [newCheck, setNewCheck] = useState({ type: 'element_exists', selector: '', points: 10 });
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/admin/stacks/available`)
+    fetch(`${API_BASE_URL}/v1/admin/stacks/available`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.stacks) {
@@ -93,7 +93,7 @@ function AdminDashboard() {
 
     setPreviewLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/stacks/generate`, {
+      const res = await fetch(`${API_BASE_URL}/v1/admin/stacks/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ authToken: user?.authToken || '', techStack }),
@@ -135,7 +135,7 @@ function AdminDashboard() {
 
     setIsSaving(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/test/create`, {
+      const res = await fetch(`${API_BASE_URL}/v1/admin/test/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

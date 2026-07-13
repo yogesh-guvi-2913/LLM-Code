@@ -39,7 +39,7 @@ function Results() {
     if (!user?.authToken) return;
 
     try {
-      const response = await fetch(`${API_BASE}/results`, {
+      const response = await fetch(`${API_BASE}/v1/results`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

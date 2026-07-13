@@ -27,7 +27,7 @@ export function useAIChat({ testId, authToken, sessionId, onCodeChanges, onError
 
     isClosingRef.current = false;
 
-    let url = `${WS_BASE_URL}/ws/ai-chat/${testId}?token=${authToken}`;
+    let url = `${WS_BASE_URL}/v1/ws/ai-chat/${testId}?token=${authToken}`;
     if (sessionId) {
       url += `&sessionId=${sessionId}`;
     }

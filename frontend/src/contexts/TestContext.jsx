@@ -171,7 +171,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('http://localhost:8000/submit-test', {
+      const response = await fetch('http://localhost:8000/v1/submit-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -350,7 +350,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
       setIsLoading(true);
 
       try {
-        const response = await fetch('http://localhost:8000/test-details', {
+        const response = await fetch('http://localhost:8000/v1/test-details', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -398,7 +398,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
           setTerminalLines(prev => [...prev, { type: 'system', text: 'Starting Docker containers...' }]);
 
           try {
-            const sessionRes = await fetch('http://localhost:8000/session/start', {
+            const sessionRes = await fetch('http://localhost:8000/v1/session/start', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ authToken, testId })
@@ -446,7 +446,7 @@ export function TestProvider({ testId, authToken, navigate, children }) {
   useEffect(() => {
     return () => {
       if (sessionInfo?.sessionId && authToken) {
-        fetch('http://localhost:8000/session/stop', {
+        fetch('http://localhost:8000/v1/session/stop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ authToken, sessionId: sessionInfo.sessionId })

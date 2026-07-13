@@ -22,7 +22,7 @@ function AutoCommand({ command, sessionInfo, authToken, isLoading }) {
     executedRef.current = true;
     setStatus('running');
 
-    fetch(`${API_BASE_URL}/session/execute`, {
+    fetch(`${API_BASE_URL}/v1/session/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

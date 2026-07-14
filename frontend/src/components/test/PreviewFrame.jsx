@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTest } from '../../contexts/TestContext';
-import { Maximize2, RefreshCw, Smartphone, Monitor, Loader2, AlertCircle } from 'lucide-react';
+import { Maximize2, RefreshCw, Smartphone, Monitor, Loader2, AlertCircle, Zap } from 'lucide-react';
 
-// const PREVIEW_BASE_URL = import.meta.env.VITE_PREVIEW_BASE_URL || window.location.origin;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 const PREVIEW_BASE_URL = 'http://localhost'
+
 function PreviewFrame() {
-  const { sessionInfo, sessionStatus } = useTest();
+  const { sessionInfo, sessionStatus, sessionType } = useTest();
   const [viewport, setViewport] = useState('desktop');
   const [iframeKey, setIframeKey] = useState(0);
   const iframeRef = useRef(null);
@@ -15,17 +16,32 @@ function PreviewFrame() {
   };
 
   const handleExpand = () => {
-    if (sessionInfo?.frontendUrl) {
-      window.open(`${PREVIEW_BASE_URL}${sessionInfo.frontendUrl}`, '_blank');
+    const url = getPreviewUrl();
+    if (url) {
+      window.open(url, '_blank');
     }
+  };
+
+  const getPreviewUrl = () => {
+    if (!sessionInfo) return null;
+    
+    if (sessionType === 'flash') {
+      return sessionInfo.previewUrl || sessionInfo.frontendUrl;
+    }
+    
+    return `${PREVIEW_BASE_URL}${sessionInfo.frontendUrl}`;
   };
 
   if (sessionStatus === 'starting' || sessionStatus === 'idle') {
     return (
       <div className="h-full flex flex-col items-center justify-center bg-gray-50">
         <Loader2 className="animate-spin mb-3 text-violet-500" size={28} />
-        <p className="text-sm text-gray-600 font-medium">Starting containers...</p>
-        <p className="text-xs text-gray-400 mt-1">Spinning up frontend, backend & database</p>
+        <p className="text-sm text-gray-600 font-medium">
+          {sessionType === 'flash' ? 'Claiming Flash sandbox...' : 'Starting containers...'}
+        </p>
+        <p className="text-xs text-gray-400 mt-1">
+          {sessionType === 'flash' ? 'Warm pool provides instant startup' : 'Spinning up frontend, backend & database'}
+        </p>
       </div>
     );
   }
@@ -45,7 +61,7 @@ function PreviewFrame() {
     );
   }
 
-  const previewUrl = `${PREVIEW_BASE_URL}${sessionInfo.frontendUrl}`;
+  const previewUrl = getPreviewUrl();
   const viewportWidth = viewport === 'mobile' ? '375px' : '100%';
 
   return (
@@ -66,6 +82,12 @@ function PreviewFrame() {
           >
             <Smartphone size={14} />
           </button>
+          {sessionType === 'flash' && (
+            <div className="flex items-center gap-1 ml-2 px-2 py-0.5 bg-amber-50 rounded text-xs text-amber-600">
+              <Zap size={12} />
+              <span>Flash</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs text-gray-400">

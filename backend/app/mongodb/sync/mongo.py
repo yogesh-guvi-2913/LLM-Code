@@ -88,6 +88,9 @@ class MongoDB:
     def delete(self, query : dict = {}):
         return self.cursor.delete_many(query)
     
+    def deleteOne(self, query : dict = {}):
+        return self.cursor.delete_one(query)
+    
     def aggregate(self, query : list | None = None):
         if (query == None): return False
         cursorObject = self.cursor.aggregate(query)

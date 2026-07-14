@@ -33,5 +33,5 @@ class CreateTestRequest(BaseModel):
     requirements: List[Dict[str, Any]] = []
     checks: List[Dict[str, Any]] = []
     techStack: Dict[str, str] = {}
-    flashTemplateId: Optional[str] = Field(default=None, description="Flash sandbox template ID")
+    flashTemplateId: str = Field(..., description="Flash sandbox template ID (required)")
     flashScoringEnabled: bool = Field(default=True, description="Enable Flash automated scoring")

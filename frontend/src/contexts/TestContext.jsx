@@ -83,6 +83,8 @@ const convertProjectFilesToState = (projectFiles) => {
   return state;
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 export function TestProvider({ testId, authToken, navigate, children }) {
   const [testData, setTestData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +108,8 @@ export function TestProvider({ testId, authToken, navigate, children }) {
   const [previewErrors, setPreviewErrors] = useState([]);
   const [sessionInfo, setSessionInfo] = useState(null);
   const [sessionStatus, setSessionStatus] = useState('idle');
+  const [sessionType, setSessionType] = useState('docker');
+  const [scoreResult, setScoreResult] = useState(null);
   const terminalEndRef = useRef(null);
   const timeLeftRef = useRef(testData?.duration || 1800);
 
@@ -203,6 +207,64 @@ export function TestProvider({ testId, authToken, navigate, children }) {
       setIsSubmitting(false);
     }
   }, [authToken, testId, answers, files, chatMessages, navigate]);
+
+  const handleFlashSubmit = useCallback(async () => {
+    if (!authToken || !sessionInfo?.sessionId || sessionType !== 'flash') return;
+    
+    setIsSubmitting(true);
+    setTerminalLines(prev => [...prev, { type: 'system', text: 'Submitting sandbox for scoring...' }]);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/v1/session/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          authToken,
+          sessionId: sessionInfo.sessionId,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setScoreResult({
+          score: data.score,
+          maxScore: data.maxScore,
+          percentage: data.percentage,
+          testResults: data.testResults,
+        });
+        setTerminalLines(prev => [...prev, { 
+          type: 'system', 
+          text: `Score: ${data.score}/${data.maxScore} (${data.percentage.toFixed(1)}%)` 
+        }]);
+        toast.success(`Scored ${data.percentage.toFixed(1)}%`);
+      } else {
+        toast.error(data.detail || 'Failed to score submission');
+      }
+    } catch (error) {
+      console.error('Error submitting Flash session:', error);
+      toast.error('Failed to submit for scoring');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [authToken, sessionInfo?.sessionId, sessionType]);
+
+  const syncFilesToFlash = useCallback(async (changes) => {
+    if (!sessionInfo?.sessionId || sessionType !== 'flash') return;
+    
+    try {
+      await fetch(`${API_BASE_URL}/v1/session/sync-files`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionInfo.sessionId,
+          changes,
+        }),
+      });
+    } catch (error) {
+      console.error('Error syncing files to Flash:', error);
+    }
+  }, [sessionInfo?.sessionId, sessionType]);
 
   const handleCodeChanges = useCallback((changes) => {
     if (!Array.isArray(changes)) return;
@@ -394,38 +456,47 @@ export function TestProvider({ testId, authToken, navigate, children }) {
 
           timeLeftRef.current = data.test.duration || 1800;
 
-          setSessionStatus('starting');
-          setTerminalLines(prev => [...prev, { type: 'system', text: 'Starting Docker containers...' }]);
+setSessionStatus('starting');
+           setTerminalLines(prev => [...prev, { type: 'system', text: 'Starting session...' }]);
 
-          try {
-            const sessionRes = await fetch('http://localhost:8000/v1/session/start', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ authToken, testId })
-            });
-            const sessionData = await sessionRes.json();
+           try {
+             const sessionRes = await fetch(`${API_BASE_URL}/v1/session/start`, {
+               method: 'POST',
+               headers: { 'Content-Type': 'application/json' },
+               body: JSON.stringify({ authToken, testId })
+             });
+             const sessionData = await sessionRes.json();
 
-            if (sessionData.success && sessionData.session) {
-              setSessionInfo(sessionData.session);
-              setSessionStatus('ready');
-              setTerminalLines(prev => [...prev, {
-                type: 'system',
-                text: `Containers ready! Preview: ${sessionData.session.frontendUrl}`
-              }]);
-            } else {
-              setSessionStatus('error');
-              setTerminalLines(prev => [...prev, {
-                type: 'error',
-                text: `Failed to start containers: ${sessionData.detail || 'Unknown error'}`
-              }]);
-            }
-          } catch (sessionErr) {
-            setSessionStatus('error');
-            setTerminalLines(prev => [...prev, {
-              type: 'error',
-              text: `Session start error: ${sessionErr.message}`
-            }]);
-          }
+             if (sessionData.success && sessionData.session) {
+               setSessionInfo(sessionData.session);
+               setSessionType(sessionData.session.sessionType || 'docker');
+               setSessionStatus('ready');
+               
+               if (sessionData.session.sessionType === 'flash') {
+                 setTerminalLines(prev => [...prev, {
+                   type: 'system',
+                   text: `Flash sandbox ready! Preview: ${sessionData.session.previewUrl || sessionData.session.frontendUrl}`
+                 }]);
+               } else {
+                 setTerminalLines(prev => [...prev, {
+                   type: 'system',
+                   text: `Containers ready! Preview: ${sessionData.session.frontendUrl}`
+                 }]);
+               }
+             } else {
+               setSessionStatus('error');
+               setTerminalLines(prev => [...prev, {
+                 type: 'error',
+                 text: `Failed to start session: ${sessionData.detail || 'Unknown error'}`
+               }]);
+             }
+           } catch (sessionErr) {
+             setSessionStatus('error');
+             setTerminalLines(prev => [...prev, {
+               type: 'error',
+               text: `Session start error: ${sessionErr.message}`
+             }]);
+           }
         } else if (data.detail === 'token_expired') {
           toast.error('Session Expired. Please Login again.');
           navigate('/login');
@@ -468,6 +539,8 @@ export function TestProvider({ testId, authToken, navigate, children }) {
     answers,
     handleAnswerChange,
     handleSubmitTest,
+    handleFlashSubmit,
+    syncFilesToFlash,
     chatMessages,
     inputMessage,
     setInputMessage,
@@ -505,6 +578,8 @@ export function TestProvider({ testId, authToken, navigate, children }) {
     wsConnected,
     sessionInfo,
     sessionStatus,
+    sessionType,
+    scoreResult,
     authToken,
   };
 

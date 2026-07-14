@@ -464,6 +464,7 @@ const Home = () => {
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
+                      onClick={() => navigate('/admin')}
                       className="px-4 py-2 rounded-lg text-white font-medium flex items-center gap-2 transition-all duration-200"
                       style={{
                         backgroundColor: 'rgba(139,92,246,0.15)',
